@@ -1,0 +1,863 @@
+---
+title: "Pocillopora Juvenile Fusion"
+author: "Ariana Huffmyer (R Markdown author)"
+date: "2019"
+output:
+  html_document:
+    code_folding: hide
+    toc: yes
+    toc_depth: 8
+    toc_float: yes
+  pdf_document:
+    keep_tex: yes
+---
+
+##Setup  
+
+Set up workspace, set options, and load required packages. 
+```{r, echo=TRUE, show=FALSE}
+rm(list=ls(all=TRUE)) 
+```
+
+```{r setup, echo=TRUE}
+knitr::opts_chunk$set(root.dir = "~/R",warning=FALSE, message=FALSE)
+```
+
+
+```{r, echo=TRUE, warnings=FALSE}
+library(gridExtra)
+library(multcomp)
+library(emmeans)
+library(ggplot2)
+library(dplyr)
+library(effects)
+library(plyr)
+library(lattice)
+library(glmmTMB)
+library(effects)
+library(lsmeans)
+library(MuMIn)
+library(MASS)
+library(car)
+library(FSA)
+library(lmerTest)
+library(lme4)
+library(blmeco)
+library(ggsci)
+library(coxme)
+library(survival)
+library(cowplot)
+library(RColorBrewer)
+library(tidyverse)
+library(partitionBEFsp)
+library(factoextra)
+library(ggfortify)
+library(cowplot)
+library(survminer)
+```
+ 
+##1. GROW OUT SURVIVORSHIP  
+###**Load data**    
+
+Survivorship is measured as binary on each individual spat in the experiment.   
+
+```{r, results=TRUE}
+#load data
+rearing<-read.csv("Data/GrowOut_Responses.csv", header=TRUE, sep=",", na.strings="NA")
+rearing$Quadrant<-as.factor(rearing$Quadrant)
+rearing$Diversity.Type<-relevel(rearing$Diversity.Type, ref="Individual")
+
+#rearing$Total.Juveniles<-as.factor(rearing$Total.Juveniles)
+#rearing$Fusion.Partners<-as.factor(rearing$Fusion.Partners)
+#rearing$Richness<-as.factor(rearing$Richness)
+```
+
+Subset the final timepoint for additional analyses.  
+```{r, results=TRUE}
+final<-rearing[which(rearing$Timepoint == "Final"),]
+multiple<-rearing[which(rearing$Community == "Multiple"),]
+multiple_final<-multiple[which(multiple$Timepoint == "Final"),]
+```
+
+###**Analysis**  
+
+Analyze with a logistic binomial regression model. 
+
+Analyze over the effect of time.  
+```{r, results=FALSE}
+#with full dataset
+survmod1<-glmer(Survivorship ~ Day + Richness + Community + Fusion.Partners + Richness:Fusion.Partners + Day:Community + Day:Richness + Day:Fusion.Partners + Day:Richness:Fusion.Partners + (1|Parent.Site/Genotype) + (1|Tank) + (1|Slide/Sample), data=rearing, family=binomial)
+
+summary(survmod1)
+Anova(survmod1, type="II")
+
+plot(allEffects(survmod1))
+
+dispersion_glmer(survmod1) #no overdispersion
+plot(residuals(survmod1)) #Dispersed randomly
+```
+
+
+Analyze with final dataset.  
+```{r, results=TRUE}
+#with final dataset
+survmod2<-glmer(Survivorship ~ Richness + Community + Fusion.Partners + Richness:Fusion.Partners + (1|Parent.Site/Genotype) + (1|Tank) + (1|Slide), data=final, family=binomial)
+
+#final dataset
+summary(effect(c("Richness", "Fusion.Partners"), xlevels=4, survmod2))
+summary(effect("Fusion.Partners", xlevels=4, survmod2))
+summary(effect("Community", xlevels=4, survmod2))
+
+dispersion_glmer(survmod2) #no overdispersion
+plot(residuals(survmod2)) + abline(h=0, lty=2) #Dispersed randomly
+
+```
+
+Create plot for effect of community type.  
+```{r, results=TRUE}
+eff.surv1 <- predictorEffect("Community", survmod2)
+surv.effects1<-plot(eff.surv1,
+                   lines=list(multiline=TRUE, 
+                              col=c("black"), 
+                              lty=1), 
+                   confint=list(style="bars", width=4, col="black"), 
+                   lwd=4,
+                   axes=list(y=list(lim=c(0, 1))),
+                   type="response", 
+                   ylab=expression(bold("Prob(Survivorship)")), 
+                   legend.position="right",
+                   xlab=expression(bold("Number of Juveniles")), 
+                   main=""); surv.effects1
+                   #lattice=list(key.args=list(space="right",
+                                              #border=FALSE, 
+                                              #title=expression(bold("Genotypic \nRichness")),
+                                              #cex=1, 
+                                              #cex.title=1)));surv.effects1
+
+```
+
+Create plots for fusion partner effects.  
+```{r, results=TRUE}
+survmod2a<-glmer(Survivorship ~ Richness + Fusion.Partners + Richness:Fusion.Partners + (1|Parent.Site/Genotype) + (1|Tank) + (1|Slide), data=final, family=binomial, subset=c(Community=="Multiple"))
+
+eff.surv2 <- predictorEffect("Fusion.Partners", survmod2a, xlevels=4, rug=TRUE)
+surv.effects2<-plot(eff.surv2,
+                   lines=list(multiline=TRUE, 
+                              col=c("lightblue","mediumblue", "blue4", "darkblue"), 
+                              lty=1), 
+                   confint=list(style="bands", alpha=0.1), 
+                   lwd=4,
+                   axes=list(y=list(lim=c(0, 1))),
+                   type="response", 
+                   ylab=expression(bold("Prob(Survivorship)")), 
+                   legend.position="right",
+                   xlab=expression(bold("Fusion Partners")), 
+                   main="",
+                   lattice=list(key.args=list(space="right",
+                                              border=FALSE, 
+                                              title=expression(bold("Genotypic \nRichness")),
+                                              cex=1, 
+                                              cex.title=1)));surv.effects2
+```
+
+```{r, results=TRUE}
+
+meansurv <- ddply(final, c("Community"), summarise,
+                   N    = length(Survivorship[!is.na(Survivorship)]),
+                   mean = mean(Survivorship, na.rm=TRUE),
+                   sd   = sd(Survivorship, na.rm=TRUE),
+                   se   = sd / sqrt(N), 
+                   max = max(Survivorship, na.rm=TRUE),
+                   lower = mean-sd, 
+                   upper = mean+sd
+                   )
+meansurv
+
+meansurv2 <- ddply(multiple_final, c("Fusion.Partners"), summarise,
+                   N    = length(Survivorship[!is.na(Survivorship)]),
+                   mean = mean(Survivorship, na.rm=TRUE),
+                   sd   = sd(Survivorship, na.rm=TRUE),
+                   se   = sd / sqrt(N), 
+                   max = max(Survivorship, na.rm=TRUE),
+                   lower = mean-sd, 
+                   upper = mean+sd
+                   )
+meansurv2
+
+```
+
+##2. GROW OUT FUSION
+
+###**Analysis**  
+
+Analyze with a logistic binomial regression model.  
+
+Final timepoint dataset. 
+
+Analyze fusion as a product of genotypic richness and total number of individuals on the slide. 
+```{r, results=FALSE}
+#with final dataset
+fusemod1<-glmer(Fusion ~ Richness + (1|Parent.Site/Genotype) + (1|Tank) + (1|Slide), data=final, family=binomial, subset=c(Community=="Multiple"))
+summary(fusemod1)
+Anova(fusemod1, type="II") # no effects on rate of fusion by the end point
+
+dispersion_glmer(fusemod1) #no overdispersion
+plot(residuals(fusemod1)) + abline(h=0, lty=2)
+```
+
+There is an effect of genotypic diversity on fusion rates. Plot the relationship.   
+```{r, results=TRUE}
+eff.fuse1 <- predictorEffect("Richness", fusemod1, xlevels=4, rug=TRUE)
+fuse.effects1<-plot(eff.fuse1,
+                   lines=list(multiline=TRUE, 
+                              col=c("black"), 
+                              lty=1),
+                   confint=list(style="bands", alpha=0.1), 
+                   lwd=4,
+                   #axes=list(y=list(lim=c(0, 1))),
+                   type="response", 
+                   ylab=expression(bold("Prob(Successful Fusion)")), 
+                   xlab=expression(bold("Richness")), 
+                   main="",
+                   lattice=list(key.args=list(space="right",
+                                              border=FALSE, 
+                                              title=expression(bold("Genotypic \nRichness")),
+                                              cex=1, 
+                                              cex.title=1)));fuse.effects1
+```
+
+Generate a summary of proportion fused at the end of the grow-out period.  
+
+```{r, results=TRUE}
+meanfusion <- ddply(multiple_final, c("Richness"), summarise,
+                   N    = length(Fusion[!is.na(Fusion)]),
+                   mean = mean(Fusion, na.rm=TRUE),
+                   sd   = sd(Fusion, na.rm=TRUE),
+                   se   = sd / sqrt(N), 
+                   max = max(Fusion, na.rm=TRUE),
+                   lower = mean-sd, 
+                   upper = mean+sd
+                   )
+meanfusion
+
+```
+
+
+##3. GROW OUT GROWTH  
+###**Analysis**  
+
+Growth is measured as polyp expansion in each spat by number of spat in each sibling type and number of fused individuals. Growth is measured in final dataset as all spat started with 1 polyp each.   
+
+Analyze polyp expansion with the final dataset.    
+ 
+```{r, results=TRUE}
+polypmod1<-glmer(Polyps ~ Richness + Community + Fusion.Partners + Richness:Fusion.Partners + (1|Parent.Site/Genotype) + (1|Tank) + (1|Slide), data=final, family = poisson)
+summary(polypmod1)
+Anova(polypmod1, type="II")
+qqPlot(residuals(polypmod1))
+
+meangrowth <- ddply(final, c("Community"), summarise,
+                   N    = length(Polyps[!is.na(Polyps)]),
+                   mean = mean(Polyps, na.rm=TRUE),
+                   sd   = sd(Polyps, na.rm=TRUE),
+                   se   = sd / sqrt(N), 
+                   max = max(Polyps, na.rm=TRUE),
+                   lower = mean-sd, 
+                   upper = mean+sd
+                   )
+meangrowth
+
+```
+
+```{r, results=TRUE}
+eff.polyps1 <- predictorEffect("Fusion.Partners", polypmod1, xlevels=4, rug=TRUE)
+polyp.effects1<-plot(eff.polyps1,
+                   lines=list(multiline=TRUE, 
+                              col=c("lightblue","mediumblue", "blue4", "darkblue"), 
+                              lty=1), 
+                   confint=list(style="bands", alpha=0.1), 
+                   lwd=4,
+                   #axes=list(y=list(lim=c(0, 1))),
+                   type="response", 
+                   ylab=expression(bold("Total Polyp Expansion")), 
+                   legend.position="right",
+                   xlab=expression(bold("Fusion Partners")), 
+                   main="",
+                   lattice=list(key.args=list(space="right",
+                                              border=FALSE, 
+                                              title=expression(bold("Genotypic \nRichness")),
+                                              cex=1, 
+                                              cex.title=1)));polyp.effects1
+```
+
+
+Combine figures for Grow-Out Period
+```{r, results=TRUE}
+grow_out_figs<-plot_grid(surv.effects1, surv.effects2, labels = c("A", "B"), ncol=2, nrow=1, rel_heights= c(1,1), rel_widths = c(0.8,1), label_size = 20, label_y=1, align="h");grow_out_figs
+
+ggsave(filename="Figures/grow_out_figs.png", plot=grow_out_figs, dpi=500, width=10, height=6, units="in")
+```
+
+
+##4. STRESS SURVIVORSHIP
+###**Load data**    
+
+Survivorship is measured as binary on each individual spat in the experiment. 
+ 
+```{r, results=TRUE}
+#load data
+stress<-read.csv("Data/Stress_Responses.csv", header=TRUE, sep=",", na.strings="NA")
+stress$Diversity.Type<-relevel(stress$Diversity.Type, ref="Individual")
+stress$Polyps<-as.numeric(stress$Polyps)
+
+```
+
+Subset the final timepoint for additional analyses.  
+```{r, results=TRUE}
+final_stress<-stress[which(stress$Timepoint == "End"),]
+multiple_stress<-stress[which(stress$Community == "Multiple"),]
+multiple_final_stress<-multiple_stress[which(multiple_stress$Timepoint == "End"),]
+d26_stress<-stress[which(stress$Timepoint == "S2D11"),]
+```
+
+###**Analysis**  
+
+Analyze with a logistic binomial regression model. 
+
+Check for effect of community type.  
+
+```{r, results=TRUE}
+#with full time dataset
+survmod3b<-glmer(Survivorship ~ Day * Treatment * Community + (1|Parent.Site/Genotype) + (1|Treatment:Tank) + (1|Slide), data=stress, family=binomial, link=logit) 
+
+summary(survmod3b)
+Anova(survmod3b, type="II")
+
+dispersion_glmer(survmod3b) #no overdispersion
+plot(residuals(survmod3b)) + abline(h=0, lty=2) #Dispersed randomly
+
+meanstresssurv1 <- ddply(final_stress, c("Community", "Treatment"), summarise,
+                   N    = length(Survivorship[!is.na(Survivorship)]),
+                   mean = mean(Survivorship, na.rm=TRUE),
+                   sd   = sd(Survivorship, na.rm=TRUE),
+                   se   = sd / sqrt(N), 
+                   max = max(Survivorship, na.rm=TRUE),
+                   lower = mean-sd, 
+                   upper = mean+sd
+                   )
+meanstresssurv1
+
+```
+
+
+Analyze with full dataset.  
+```{r, results=TRUE}
+#with full time dataset
+
+survmod3<-glmer(Survivorship ~ Day * Treatment * Fusion.Partners * Richness + (1|Parent.Site/Genotype) + (1|Treatment:Tank) + (1|Slide/Sample), data=stress, family=binomial, subset=c(Community=="Multiple")) 
+
+fixed_form<-glm(Survivorship ~ Day * Treatment * Fusion.Partners, data=stress, family=binomial, subset=c(Community=="Multiple"))
+
+library("brglm2"); glm(fixed_form, data = stress, family = binomial, method="detect_separation")
+
+summary(survmod3)
+Anova(survmod3, type="II")
+
+dispersion_glmer(survmod3) #no overdispersion
+plot(residuals(survmod3)) + abline(h=0, lty=2) #Dispersed randomly
+
+meanstresssurv2 <- ddply(final_stress, c("Fusion.Partners", "Treatment"), summarise,
+                   N    = length(Survivorship[!is.na(Survivorship)]),
+                   mean = mean(Survivorship, na.rm=TRUE),
+                   sd   = sd(Survivorship, na.rm=TRUE),
+                   se   = sd / sqrt(N), 
+                   max = max(Survivorship, na.rm=TRUE),
+                   lower = mean-sd, 
+                   upper = mean+sd
+                   )
+meanstresssurv2
+```
+
+
+Create plot for effect of community type.  
+
+```{r, results=TRUE}
+eff.surv3b <- predictorEffect("Community", survmod3b)
+
+surv.effects3b<-plot(eff.surv3b,
+                   lines=list(multiline=TRUE, 
+                              col=c("blue", "red"), 
+                              lty=1), 
+                   confint=list(style="bars", width=4, col="black"), 
+                   lwd=4,
+                   #axes=list(y=list(lim=c(0, 1))),
+                   type="rescale", 
+                   ylab=expression(bold("Prob(Survivorship)")), 
+                   legend.position="none",
+                   xlab=expression(bold("Number of Juveniles")), 
+                   main="",
+                   lattice=list(key.args=list(space="none",
+                                              border=FALSE, 
+                                              title=expression(bold("Temperature")),
+                                              cex=1, 
+                                              cex.title=1)));surv.effects3b
+```
+
+Plot effect of community over time.  
+
+```{r, results=TRUE}
+
+stress$group<-paste(stress$Treatment, "-", stress$Community)
+
+survmod3b2<-glmer(Survivorship ~ group * Day + (1|Parent.Site/Genotype) + (1|Treatment:Tank) + (1|Slide), data=stress, family=binomial, link=logit) 
+
+
+eff.surv3b2 <- predictorEffect(c("Day"), survmod3b2)
+surv.effects3b2<-plot(eff.surv3b2,
+                   lines=list(multiline=TRUE, 
+                              col=c("blue", "blue", "red", "red"), 
+                              lty=c(1, 2, 1, 2)), 
+                   confint=list(style="bands", alpha=0.1), 
+                   lwd=4,
+                   axes=list(y=list(lim=c(0, 1.1))),
+                   type="response", 
+                   ylab=expression(bold("Prob(Survivorship)")), 
+                   legend.position="top",
+                   xlab=expression(bold("Day")), 
+                   main="",
+                   lattice=list(key.args=list(space="top",
+                                              border=FALSE, 
+                                              title=expression(bold("Temperature - Number of Juveniles")),
+                                              cex=1, 
+                                              cex.title=1)));surv.effects3b2
+
+```
+
+Examine curve estimates to identify 50% survivorship.  
+
+```{r, results=TRUE}
+summary(effect(c("group", "Day"), xlevels=50, survmod3b2))
+```
+
+
+Create plot for effect of temperature in multiple communities.      
+```{r, results=TRUE}
+stress$group<-paste(stress$Treatment, "-", stress$Fusion.Partners)
+
+survmod3a<-glmer(Survivorship ~ Day * group + (1|Parent.Site/Genotype) + (1|Treatment:Tank) + (1|Slide), data=stress, family=binomial, link=logit)
+
+summary(effect(c("Day", "group"), xlevels=50, survmod3a))
+
+eff.surv3 <- predictorEffect(c("Day"), survmod3a)
+surv.effects3<-plot(eff.surv3,
+                   lines=list(multiline=TRUE, 
+                              col=c("blue", "blue", "blue", "blue", "red", "red", "red", "red"), 
+                              lty=c(1, 2, 4, 3, 1, 2, 4, 3)), 
+                   confint=list(style="bands", alpha=0.1), 
+                   lwd=4,
+                   axes=list(y=list(lim=c(0, 1.1))),
+                   type="response", 
+                   ylab=expression(bold("Prob(Survivorship)")), 
+                   legend.position="top",
+                   xlab=expression(bold("Day")), 
+                   main="",
+                   lattice=list(key.args=list(space="top",
+                                              border=FALSE, 
+                                              title=expression(bold("Temperature - Fusion Partners")),
+                                              cex=1, 
+                                              cex.title=1)));surv.effects3
+
+```
+
+```{r, results=TRUE}
+meanstresssurv2 <- ddply(multiple_final_stress, c("Fusion.Partners", "Treatment"), summarise,
+                   N    = length(Survivorship[!is.na(Survivorship)]),
+                   mean = mean(Survivorship, na.rm=TRUE),
+                   sd   = sd(Survivorship, na.rm=TRUE),
+                   se   = sd / sqrt(N), 
+                   max = max(Survivorship, na.rm=TRUE),
+                   lower = mean-sd, 
+                   upper = mean+sd
+                   )
+meanstresssurv2
+
+```
+
+##5. STRESS FUSION  
+
+###**Analysis**  
+
+Analyze with a logistic binomial regression model.    
+
+Analyze fusion over the course of the stress test.  
+
+```{r, results=FALSE}
+#with full
+fusemod2<-glmer(Fusion ~  Day * Treatment * Richness + (1|Parent.Site/Genotype) + (1|Treatment:Tank) + (1|Slide/Sample), data=stress, family=binomial, link=logit, subset=c(Community=="Multiple"))
+
+summary(fusemod2)
+Anova(fusemod2, type="II") 
+
+plot(allEffects(fusemod2))
+
+dispersion_glmer(fusemod2) #no overdispersion
+plot(residuals(fusemod2)) + abline(h=0, lty=2)
+```
+
+There is an effect of treatment and day and richness. Plot this relationship.   
+```{r, results=TRUE}
+stress$group<-paste(stress$Treatment, "-", stress$Richness)
+
+fusemod2a<-glmer(Fusion ~  Day * group + (1|Parent.Site/Genotype) + (1|Treatment:Tank) + (1|Slide/Sample), data=stress, family=binomial, link=logit, subset=c(Community=="Multiple"))
+
+eff.fuse2 <- predictorEffect("Day", xlevels=4, fusemod2a, rug=TRUE)
+
+fuse.effects2<-plot(eff.fuse2,
+                   lines=list(multiline=TRUE, 
+                              col=c("blue", "blue", "blue", "blue", "red", "red", "red", "red"), 
+                              lty=c(1, 2, 4, 3, 1, 2, 4, 3)),
+                   confint=list(style="none"), 
+                   lwd=4,
+                   axes=list(y=list(lim=c(0, 1))),
+                   type="response", 
+                   ylab=expression(bold("Prob(Successful Fusion)")), 
+                   legend.position="right",
+                   xlab=expression(bold("Time (Days)")), 
+                   main="",
+                   lattice=list(key.args=list(space="none",
+                                              border=FALSE, 
+                                              title=expression(bold("Temperature - \nGenotypic Richness")),
+                                              cex=1, 
+                                              cex.title=1)));fuse.effects2
+
+fusemod2b<-glmer(Fusion ~  Day * Treatment + (1|Parent.Site/Genotype) + (1|Treatment:Tank) + (1|Slide/Sample), data=stress, family=binomial, link=logit, subset=c(Community=="Multiple"))
+Anova(fusemod2b, type="II") 
+
+eff.fuse2b <- predictorEffect("Day", xlevels=4, fusemod2b, rug=TRUE)
+
+fuse.effects2b<-plot(eff.fuse2b,
+                   lines=list(multiline=TRUE, 
+                              col=c("blue", "red"), 
+                              lty=c(1)),
+                   confint=list(style="bands"), 
+                   lwd=4,
+                   axes=list(y=list(lim=c(0.8, 1))),
+                   type="response", 
+                   ylab=expression(bold("Prob(Successful Fusion)")), 
+                   legend.position="right",
+                   xlab=expression(bold("Time (Days)")), 
+                   main="",
+                   lattice=list(key.args=list(space="none",
+                                              border=FALSE, 
+                                              title=expression(bold("Temperature")),
+                                              cex=1, 
+                                              cex.title=1)));fuse.effects2b
+
+```
+
+
+Analyze fusion as a product of treatment and genotypic richness at the end of the experiment.  
+```{r, results=TRUE}
+#with final dataset
+fusemod3<-glmer(Fusion ~ Treatment   + (1|Treatment:Tank) + (1|Parent.Site/Genotype) + (1|Slide), data=stress, link=logit, family=binomial, subset=c(Community=="Multiple" & Timepoint == "End"))
+summary(fusemod3)
+Anova(fusemod3, type="II") # no effects on rate of fusion by the end point
+
+plot(allEffects(fusemod3))
+
+dispersion_glmer(fusemod3) #no overdispersion
+plot(residuals(fusemod3)) + abline(h=0, lty=2)
+```
+ 
+```{r, results=TRUE}
+meanstressfuse <- ddply(multiple_final_stress, c("Treatment", "Richness", "Timepoint"), summarise,
+                   N    = length(Fusion[!is.na(Fusion)]),
+                   mean = mean(Fusion, na.rm=TRUE),
+                   sd   = sd(Fusion, na.rm=TRUE),
+                   se   = sd / sqrt(N), 
+                   max = max(Fusion, na.rm=TRUE),
+                   lower = mean-sd, 
+                   upper = mean+sd
+                   )
+meanstressfuse
+```
+  
+ 
+```{r, results=TRUE}
+
+eff.fuse3 <- predictorEffect("Treatment", fusemod3, xlevels=4, rug=TRUE)
+
+fuse.effects3<-plot(eff.fuse3,
+                   lines=list(multiline=TRUE, 
+                              col=c("black"), 
+                              lty=c(1,2,4,3)),
+                   confint=list(style="bars"), 
+                   lwd=4,
+                   #axes=list(y=list(lim=c(0, 1))),
+                   type="response", 
+                   ylab=expression(bold("Prob(Successful Fusion)")), 
+                   legend.position="right",
+                   xlab=expression(bold("Temperature Treatment")), 
+                   main="",
+                   lattice=list(key.args=list(space="right",
+                                              border=FALSE, 
+                                              title=expression(bold("Genotypic \nRichness")),
+                                              cex=1, 
+                                              cex.title=1)));fuse.effects3
+```
+
+No effects at the end of the experiment.  
+
+##6. STRESS GROWTH  
+
+Analyze with a poisson regression model.   
+
+Analyze growth during the stress test. 
+
+Test for effect of temperature: 
+```{r, results=FALSE}
+#with full dataset 
+polypmod2<-glmer(Polyps ~ Treatment + Community + Community:Treatment + (1|Parent.Site/Genotype) + (1|Treatment:Tank) + (1|Slide), data=stress, family = poisson, subset=c(Timepoint=="S2D11"))
+
+summary(polypmod2)
+Anova(polypmod2, type="II")
+qqPlot(residuals(polypmod2))
+
+polypmod2a<-glmer(Polyps^2 ~ Day * Treatment * Community + (1|Parent.Site/Genotype) + (1|Treatment:Tank) + (1|Slide/Sample), data=stress, family = poisson)
+
+summary(polypmod2a)
+Anova(polypmod2a, type="II")
+qqPlot(residuals(polypmod2a))
+
+```
+
+Plot difference in temperature:    
+
+```{r, results=TRUE}
+stress$group<-paste(stress$Treatment, "-", stress$Community)
+
+polypmod2b<-glmer(Polyps^2 ~ Day * group + (1|Parent.Site/Genotype) + (1|Treatment:Tank) + (1|Slide/Sample), data=stress, family = poisson)
+
+eff.surv5 <- predictorEffect("Day", xlevels=4, polypmod2b)
+
+polyp.effects2<-plot(eff.surv5,
+                   lines=list(multiline=TRUE, 
+                              col=c("blue", "blue", "red", "red"), 
+                              lty=c(1,2, 1, 2)), 
+                   confint=list(style="bands", width=4), 
+                   lwd=4,
+                   #axes=list(y=list(lim=c(0, 1))),
+                   type="response", 
+                   ylab=expression(bold("(Total Polyp Expansion)"^2)), 
+                   legend.position="right",
+                   xlab=expression(bold("Time (Days)")), 
+                   main="", 
+                   lattice=list(key.args=list(space="top",
+                                              border=FALSE, 
+                                              title=expression(bold("Treatment - Number of Juveniles")),
+                                              cex=1, 
+                                              cex.title=1)));polyp.effects2
+
+```
+
+ 
+Analysis of multiple: 
+```{r, results=FALSE}
+#with full dataset 
+polypmod2a<-glmer(Polyps^2 ~ Day * Fusion.Partners * Richness * Treatment + (1|Parent.Site/Genotype) + (1|Treatment:Tank) + (1|Slide/Sample), data=stress, family = poisson, subset=c(Community=="Multiple"))
+
+summary(polypmod2a)
+Anova(polypmod2a, type="II")
+qqPlot(residuals(polypmod2a))
+
+meanstressgrowth <- ddply(stress, c("Community", "Treatment", "Timepoint"), summarise,
+                   N    = length(Polyps[!is.na(Polyps)]),
+                   mean = mean(Polyps, na.rm=TRUE),
+                   sd   = sd(Polyps, na.rm=TRUE),
+                   se   = sd / sqrt(N), 
+                   max = max(Polyps, na.rm=TRUE),
+                   lower = mean-sd, 
+                   upper = mean+sd
+                   )
+meanstressgrowth
+
+meanstressgrowth2 <- ddply(multiple_final_stress, c("Treatment", "Fusion.Partners", "Richness"), summarise,
+                   N    = length(Polyps[!is.na(Polyps)]),
+                   mean = mean(Polyps, na.rm=TRUE),
+                   sd   = sd(Polyps, na.rm=TRUE),
+                   se   = sd / sqrt(N), 
+                   max = max(Polyps, na.rm=TRUE),
+                   lower = mean-sd, 
+                   upper = mean+sd
+                   )
+meanstressgrowth2
+```
+
+
+Combine figures for Stress Period
+```{r, results=TRUE}
+stress_figs<-plot_grid(fuse.effects2, surv.effects3b2, surv.effects3, polyp.effects2, labels = c("A", "B", "C", "D"), ncol=4, nrow=1, rel_heights= c(1,1,1,1), rel_widths = c(0.6,1,1,1), label_size = 20, label_y=1, align="h");stress_figs
+
+ggsave(filename="Figures/New/stress_figs.png", plot=stress_figs, dpi=500, width=20, height=6, units="in")
+```
+
+
+##7. TEMPERATURE DATA
+
+Load in temperature data from Apex files.    
+
+```{r, restults=TRUE}
+juvtemps<-read.csv("Data/ApexTemps.csv", header=T, na.strings="NA")
+#convert Date and Time to date/time format
+juvtemps$Date <- as.POSIXct(juvtemps$Date, format="%m/%d/%y %H:%M")
+
+#convert to long format
+juvtemps<-juvtemps %>% gather(Tank, Temperature, Tank17:Tank24)
+juvtemps$Tank<-as.factor(juvtemps$Tank)
+
+dailymax<-juvtemps[which(juvtemps$TimeDay == "930"),]
+dailymax<-juvtemps[which(juvtemps$Phase == "Stress"),]
+
+dailymax$Treatment<-ifelse(dailymax$Tank %in% c("Tank17"), "Ambient",
+                            ifelse(dailymax$Tank %in% c("Tank18"), "Ambient", 
+                            ifelse(dailymax$Tank %in% c("Tank19"), "High",
+                            ifelse(dailymax$Tank %in% c("Tank20"), "High",
+                            ifelse(dailymax$Tank %in% c("Tank21"), "Ambient",
+                            ifelse(dailymax$Tank %in% c("Tank22"), "High",
+                            ifelse(dailymax$Tank %in% c("Tank23"), "Ambient",
+                            ifelse(dailymax$Tank %in% c("Tank24"), "High",NA))))))))
+
+maxtemps <- ddply(dailymax, c("Treatment"), summarise,
+                   N    = length(Temperature[!is.na(Temperature)]),
+                   mean = mean(Temperature, na.rm=TRUE),
+                   sd   = sd(Temperature, na.rm=TRUE),
+                   se   = sd / sqrt(N), 
+                   max = max(Temperature, na.rm=TRUE),
+                   lower = mean-sd, 
+                   upper = mean+sd
+                   )
+
+juvtemps$Period<-ifelse(juvtemps$Phase %in% c("Stress"), "Stress",
+                            ifelse(juvtemps$Phase %in% c("Stress2"), "Stress", 
+                            ifelse(juvtemps$Phase %in% c("Acclimation"), "Stress",
+                            ifelse(juvtemps$Phase %in% c("Hurricane"), "Hurricane",
+                            ifelse(juvtemps$Phase %in% c("Ambient"), "Grow-Out",NA)))))
+
+
+```
+
+Plot timeseries of temperature data with tank temperature in colors.   
+
+```{r, results=TRUE}
+#subset temperature measurements
+
+juvtempsHIGH<-subset(juvtemps, Period==c("Stress"), c(Date, TimeDay, Phase, Tank, Temperature, Period))
+juvtempsHIGH$Treatment<-ifelse(juvtempsHIGH$Tank %in% c("Tank17"), "Ambient",
+                            ifelse(juvtempsHIGH$Tank %in% c("Tank18"), "Ambient", 
+                            ifelse(juvtempsHIGH$Tank %in% c("Tank19"), "High",
+                            ifelse(juvtempsHIGH$Tank %in% c("Tank20"), "High",
+                            ifelse(juvtempsHIGH$Tank %in% c("Tank21"), "Ambient",
+                            ifelse(juvtempsHIGH$Tank %in% c("Tank22"), "High",
+                            ifelse(juvtempsHIGH$Tank %in% c("Tank23"), "Ambient",
+                            ifelse(juvtempsHIGH$Tank %in% c("Tank24"), "High",NA))))))))
+
+juvtempsHURR<-subset(juvtemps, Period==c("Hurricane"), c(Date, TimeDay, Phase, Tank, Temperature, Period))
+juvtempsHURR$Treatment<-ifelse(juvtempsHURR$Tank %in% c("Tank17"), "Ambient",
+                            ifelse(juvtempsHURR$Tank %in% c("Tank18"), "Ambient", 
+                            ifelse(juvtempsHURR$Tank %in% c("Tank19"), "High",
+                            ifelse(juvtempsHURR$Tank %in% c("Tank20"), "High",
+                            ifelse(juvtempsHURR$Tank %in% c("Tank21"), "Ambient",
+                            ifelse(juvtempsHURR$Tank %in% c("Tank22"), "High",
+                            ifelse(juvtempsHURR$Tank %in% c("Tank23"), "Ambient",
+                            ifelse(juvtempsHURR$Tank %in% c("Tank24"), "High",NA))))))))
+
+juvtempsGROW<-subset(juvtemps, Period==c("Grow-Out"), c(Date, TimeDay, Phase, Tank, Temperature, Period))
+juvtempsGROW$Treatment<-ifelse(juvtempsGROW$Tank %in% c("Tank17"), "Ambient",
+                            ifelse(juvtempsGROW$Tank %in% c("Tank18"), "Ambient", 
+                            ifelse(juvtempsGROW$Tank %in% c("Tank19"), "Ambient",
+                            ifelse(juvtempsGROW$Tank %in% c("Tank20"), "Ambient",
+                            ifelse(juvtempsGROW$Tank %in% c("Tank21"), "Ambient",
+                            ifelse(juvtempsGROW$Tank %in% c("Tank22"), "Ambient",
+                            ifelse(juvtempsGROW$Tank %in% c("Tank23"), "Ambient",
+                            ifelse(juvtempsGROW$Tank %in% c("Tank24"), "Ambient",NA))))))))
+
+juvtemps<-rbind(juvtempsHIGH, juvtempsGROW)
+juvtemps<-rbind(juvtemps, juvtempsHURR)
+
+TimeSeries1j<-ggplot(juvtemps, aes(x = Date, y = Temperature)) + 
+  geom_line(aes(color = Treatment), size = 1) +
+  scale_color_manual(values=c("blue", "red")) +
+  ylab("Temperature (°C)")+
+  xlab("Date")+
+  ylim(26,32)+
+  geom_vline(xintercept = as.POSIXct(as.Date(c("2018-07-31 10:00:00"))), linetype="solid", 
+                color = "black", size=1)+
+  geom_vline(xintercept = as.POSIXct(as.Date(c("2018-08-16 00:00:00"))), linetype="dashed", 
+                color = "black", size=1)+
+  geom_vline(xintercept = as.POSIXct(as.Date(c("2018-09-20 16:00:00"))), linetype="dotted", 
+                color = "black", size=1)+
+  theme_classic()+
+  scale_x_datetime(limits = as.POSIXct(as.Date(c("2018-07-30 09:00:00", "2018-09-20 21:00:00")))) +
+  theme(legend.position="none")+
+  theme(text = element_text(size = 18, color="black"))+
+  theme(axis.text = element_text(size=16, color="black"));TimeSeries1j
+```
+
+
+Plot by time of day by summarizing the mean temp at each time of day for each tank. Display the mean temperatures of each treatment during the Ambient and Stress phases.   
+
+```{r, results=FALSE}
+QuarterlyJ <- ddply(juvtemps, c("TimeDay", "Treatment"), summarise,
+                   N    = length(Temperature[!is.na(Temperature)]),
+                   mean = mean(Temperature, na.rm=TRUE),
+                   sd   = sd(Temperature, na.rm=TRUE),
+                   se   = sd / sqrt(N), 
+                   max = max(Temperature, na.rm=TRUE),
+                   lower = mean-sd, 
+                   upper = mean+sd
+                   )
+
+MeansJtemp <- ddply(juvtemps, c("Period", "Treatment"), summarise,
+                   N    = length(Temperature[!is.na(Temperature)]),
+                   mean = mean(Temperature, na.rm=TRUE),
+                   sd   = sd(Temperature, na.rm=TRUE),
+                   se   = sd / sqrt(N)
+                   )
+MeansJtemp
+
+MeansJtemp2 <- ddply(juvtemps, c("Treatment"), summarise,
+                   N    = length(Temperature[!is.na(Temperature)]),
+                   mean = mean(Temperature, na.rm=TRUE),
+                   max = max(Temperature, na.rm=TRUE),
+                   sd   = sd(Temperature, na.rm=TRUE),
+                   se   = sd / sqrt(N)
+                   )
+MeansJtemp2
+```
+
+
+```{r, results=TRUE}
+JuvTempsDay<-ggplot(QuarterlyJ, aes(x = TimeDay, y = mean, color=Treatment, fill=Treatment)) + 
+  geom_line(color="black", size = 1) +
+  #facet_wrap(~Period) +
+  scale_x_continuous(breaks=c(0, 720, 1440), labels=c("0:00", "12:00", "24:00")) +
+  scale_color_manual(values = c("blue", "red")) +
+  scale_fill_manual(values = c("blue", "red")) +
+  theme_classic() +
+  geom_ribbon(aes(ymin=QuarterlyJ$lower, ymax=QuarterlyJ$upper), linetype=2, alpha=0.4, color=NA) +
+  ylab("Temperature (°C)") +
+  xlab("Time of Day") +
+  ylim(26,32)+
+  theme(text = element_text(size = 18, color="black"))+
+  theme(panel.margin = unit(2, "lines"))+
+  theme(axis.text = element_text(size=16, color="black")); JuvTempsDay
+```
+
+
+Combine figures for temperature.  
+```{r, results=TRUE}
+temp_figs<-plot_grid(TimeSeries1j, JuvTempsDay, labels = c("A", "B"), ncol=2, nrow=1, rel_heights= c(1,1), rel_widths = c(1,0.8), label_size = 20, label_y=1, align="h");temp_figs
+
+ggsave(filename="Figures/temp_figs.png", plot=temp_figs, dpi=500, width=14, height=6, units="in")
+```
+
