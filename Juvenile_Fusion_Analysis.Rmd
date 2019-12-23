@@ -779,10 +779,23 @@ TimeSeries1j<-ggplot(juvtemps, aes(x = Date, y = Temperature)) +
 ```
 
 
-Plot by time of day by summarizing the mean temp at each time of day for each tank. Display the mean temperatures of each treatment during the Ambient and Stress phases.   
+Plot by time of day by summarizing the mean temp at each time of day for each tank. Display the mean temperatures of each treatment during the Stress test phase (excluding the pause in treatment due to the hurricane system shutdown).     
 
 ```{r, results=FALSE}
-QuarterlyJ <- ddply(juvtemps, c("TimeDay", "Treatment"), summarise,
+#subset juv temps for the stress period
+juvtempsSTRESS<-juvtemps
+juvtempsSTRESS$Period<-ifelse(juvtempsSTRESS$Phase %in% c("Stress"), "Stress",
+                            ifelse(juvtempsSTRESS$Phase %in% c("Stress2"), "Stress", 
+                            ifelse(juvtempsSTRESS$Phase %in% c("Acclimation"), "Acclimation",
+                            ifelse(juvtempsSTRESS$Phase %in% c("Hurricane"), "Hurricane",
+                            ifelse(juvtempsSTRESS$Phase %in% c("Ambient"), "Grow-Out",NA)))))
+
+juvtempsSTRESS
+
+juvtempsSTRESS<-juvtempsSTRESS[which(juvtempsSTRESS$Phase == "Stress"),]
+
+
+QuarterlyJ <- ddply(juvtempsSTRESS, c("TimeDay", "Treatment"), summarise,
                    N    = length(Temperature[!is.na(Temperature)]),
                    mean = mean(Temperature, na.rm=TRUE),
                    sd   = sd(Temperature, na.rm=TRUE),
