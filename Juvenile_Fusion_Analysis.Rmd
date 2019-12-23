@@ -12,7 +12,7 @@ output:
     keep_tex: yes
 ---
 
-##Setup  
+## Setup   
 
 Set up workspace, set options, and load required packages. 
 ```{r, echo=TRUE, show=FALSE}
@@ -56,8 +56,8 @@ library(cowplot)
 library(survminer)
 ```
  
-##1. GROW OUT SURVIVORSHIP  
-###**Load data**    
+## 1. GROW OUT SURVIVORSHIP  
+### **Load data**    
 
 Survivorship is measured as binary on each individual spat in the experiment.   
 
@@ -79,7 +79,7 @@ multiple<-rearing[which(rearing$Community == "Multiple"),]
 multiple_final<-multiple[which(multiple$Timepoint == "Final"),]
 ```
 
-###**Analysis**  
+### **Analysis**  
 
 Analyze with a logistic binomial regression model. 
 
@@ -186,9 +186,9 @@ meansurv2
 
 ```
 
-##2. GROW OUT FUSION
+## 2. GROW OUT FUSION
 
-###**Analysis**  
+### **Analysis**  
 
 Analyze with a logistic binomial regression model.  
 
@@ -243,8 +243,8 @@ meanfusion
 ```
 
 
-##3. GROW OUT GROWTH  
-###**Analysis**  
+## 3. GROW OUT GROWTH  
+### **Analysis**  
 
 Growth is measured as polyp expansion in each spat by number of spat in each sibling type and number of fused individuals. Growth is measured in final dataset as all spat started with 1 polyp each.   
 
@@ -299,8 +299,8 @@ ggsave(filename="Figures/grow_out_figs.png", plot=grow_out_figs, dpi=500, width=
 ```
 
 
-##4. STRESS SURVIVORSHIP
-###**Load data**    
+## 4. STRESS SURVIVORSHIP
+### **Load data**    
 
 Survivorship is measured as binary on each individual spat in the experiment. 
  
@@ -320,7 +320,7 @@ multiple_final_stress<-multiple_stress[which(multiple_stress$Timepoint == "End")
 d26_stress<-stress[which(stress$Timepoint == "S2D11"),]
 ```
 
-###**Analysis**  
+### **Analysis**  
 
 Analyze with a logistic binomial regression model. 
 
@@ -483,9 +483,9 @@ meanstresssurv2
 
 ```
 
-##5. STRESS FUSION  
+## 5. STRESS FUSION  
 
-###**Analysis**  
+### **Analysis**  
 
 Analyze with a logistic binomial regression model.    
 
@@ -608,7 +608,7 @@ fuse.effects3<-plot(eff.fuse3,
 
 No effects at the end of the experiment.  
 
-##6. STRESS GROWTH  
+## 6. STRESS GROWTH  
 
 Analyze with a poisson regression model.   
 
@@ -702,7 +702,7 @@ ggsave(filename="Figures/New/stress_figs.png", plot=stress_figs, dpi=500, width=
 ```
 
 
-##7. TEMPERATURE DATA
+## 7. TEMPERATURE DATA
 
 Load in temperature data from Apex files.    
 
