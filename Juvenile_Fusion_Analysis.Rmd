@@ -6,8 +6,9 @@ output:
   html_document:
     code_folding: hide
     toc: yes
-    toc_depth: 8
+    toc_depth: 6
     toc_float: yes
+    smart: false
   pdf_document:
     keep_tex: yes
 ---
@@ -81,24 +82,9 @@ multiple_final<-multiple[which(multiple$Timepoint == "Final"),]
 
 ### **Analysis**  
 
-Analyze with a logistic binomial regression model. 
+Analyze with a logistic binomial regression model.  
 
-Analyze over the effect of time.  
-```{r, results=FALSE}
-#with full dataset
-survmod1<-glmer(Survivorship ~ Day + Richness + Community + Fusion.Partners + Richness:Fusion.Partners + Day:Community + Day:Richness + Day:Fusion.Partners + Day:Richness:Fusion.Partners + (1|Parent.Site/Genotype) + (1|Tank) + (1|Slide/Sample), data=rearing, family=binomial)
-
-summary(survmod1)
-Anova(survmod1, type="II")
-
-plot(allEffects(survmod1))
-
-dispersion_glmer(survmod1) #no overdispersion
-plot(residuals(survmod1)) #Dispersed randomly
-```
-
-
-Analyze with final dataset.  
+Analyze at the final timepoint.  
 ```{r, results=TRUE}
 #with final dataset
 survmod2<-glmer(Survivorship ~ Richness + Community + Fusion.Partners + Richness:Fusion.Partners + (1|Parent.Site/Genotype) + (1|Tank) + (1|Slide), data=final, family=binomial)
@@ -160,6 +146,7 @@ surv.effects2<-plot(eff.surv2,
                                               cex.title=1)));surv.effects2
 ```
 
+Generate mean values of survivorship for 1) number of juveniles and 2) within "multiple" juvenile groups, mean values for number of fusion partners.   
 ```{r, results=TRUE}
 
 meansurv <- ddply(final, c("Community"), summarise,
@@ -188,13 +175,13 @@ meansurv2
 
 ## 2. GROW OUT FUSION
 
-### **Analysis**  
+### **Analysis**   
 
 Analyze with a logistic binomial regression model.  
 
 Final timepoint dataset. 
 
-Analyze fusion as a product of genotypic richness and total number of individuals on the slide. 
+Analyze fusion as a product of genotypic richness within "multiple" juvenile groups.   
 ```{r, results=FALSE}
 #with final dataset
 fusemod1<-glmer(Fusion ~ Richness + (1|Parent.Site/Genotype) + (1|Tank) + (1|Slide), data=final, family=binomial, subset=c(Community=="Multiple"))
@@ -246,9 +233,9 @@ meanfusion
 ## 3. GROW OUT GROWTH  
 ### **Analysis**  
 
-Growth is measured as polyp expansion in each spat by number of spat in each sibling type and number of fused individuals. Growth is measured in final dataset as all spat started with 1 polyp each.   
+Growth is measured as polyp expansion in each spat by number of spat in each sibling type and number of fused individuals. Growth is measured in final dataset as all spat started with 1 polyp each.    
 
-Analyze polyp expansion with the final dataset.    
+Analyze polyp expansion with the final dataset and present means.    
  
 ```{r, results=TRUE}
 polypmod1<-glmer(Polyps ~ Richness + Community + Fusion.Partners + Richness:Fusion.Partners + (1|Parent.Site/Genotype) + (1|Tank) + (1|Slide), data=final, family = poisson)
@@ -268,6 +255,8 @@ meangrowth <- ddply(final, c("Community"), summarise,
 meangrowth
 
 ```
+
+Plot the model outputs.  
 
 ```{r, results=TRUE}
 eff.polyps1 <- predictorEffect("Fusion.Partners", polypmod1, xlevels=4, rug=TRUE)
@@ -291,7 +280,7 @@ polyp.effects1<-plot(eff.polyps1,
 ```
 
 
-Combine figures for Grow-Out Period
+Combine figures for Grow-Out Period.  
 ```{r, results=TRUE}
 grow_out_figs<-plot_grid(surv.effects1, surv.effects2, labels = c("A", "B"), ncol=2, nrow=1, rel_heights= c(1,1), rel_widths = c(0.8,1), label_size = 20, label_y=1, align="h");grow_out_figs
 
@@ -310,9 +299,9 @@ stress<-read.csv("Data/Stress_Responses.csv", header=TRUE, sep=",", na.strings="
 stress$Diversity.Type<-relevel(stress$Diversity.Type, ref="Individual")
 stress$Polyps<-as.numeric(stress$Polyps)
 
-```
+``` 
 
-Subset the final timepoint for additional analyses.  
+Subset the final timepoint, "multiple" juvenile datasets for additional analyses.  
 ```{r, results=TRUE}
 final_stress<-stress[which(stress$Timepoint == "End"),]
 multiple_stress<-stress[which(stress$Community == "Multiple"),]
@@ -324,7 +313,7 @@ d26_stress<-stress[which(stress$Timepoint == "S2D11"),]
 
 Analyze with a logistic binomial regression model. 
 
-Check for effect of community type.  
+Check for effect of community type ("individual" or "multiple" juveniles) on survivorship and display means.    
 
 ```{r, results=TRUE}
 #with full time dataset
@@ -379,7 +368,7 @@ meanstresssurv2
 ```
 
 
-Create plot for effect of community type.  
+Create plot for effect of number of juveniles ("individual" or "multiple").  
 
 ```{r, results=TRUE}
 eff.surv3b <- predictorEffect("Community", survmod3b)
@@ -403,7 +392,7 @@ surv.effects3b<-plot(eff.surv3b,
                                               cex.title=1)));surv.effects3b
 ```
 
-Plot effect of community over time.  
+Plot effect of number of juveniles over time.  
 
 ```{r, results=TRUE}
 
@@ -440,7 +429,8 @@ summary(effect(c("group", "Day"), xlevels=50, survmod3b2))
 ```
 
 
-Create plot for effect of temperature in multiple communities.      
+Create plot for effect of temperature on survival in multiple juvenile groups across number of fusion partners.  
+
 ```{r, results=TRUE}
 stress$group<-paste(stress$Treatment, "-", stress$Fusion.Partners)
 
@@ -469,6 +459,8 @@ surv.effects3<-plot(eff.surv3,
 
 ```
 
+Display mean survivorship within multiple juvenile groups at the end of the experiment.  
+
 ```{r, results=TRUE}
 meanstresssurv2 <- ddply(multiple_final_stress, c("Fusion.Partners", "Treatment"), summarise,
                    N    = length(Survivorship[!is.na(Survivorship)]),
@@ -485,11 +477,11 @@ meanstresssurv2
 
 ## 5. STRESS FUSION  
 
-### **Analysis**  
+### **Analysis**   
 
 Analyze with a logistic binomial regression model.    
 
-Analyze fusion over the course of the stress test.  
+Analyze fusion success over the course of the stress test.  
 
 ```{r, results=FALSE}
 #with full
@@ -606,22 +598,22 @@ fuse.effects3<-plot(eff.fuse3,
                                               cex.title=1)));fuse.effects3
 ```
 
-No effects at the end of the experiment.  
+No effects at the end of the experiment, we will report full analysis over time during the stress test.    
 
 ## 6. STRESS GROWTH  
+ 
+Analyze with a poisson regression model.    
 
-Analyze with a poisson regression model.   
-
-Analyze growth during the stress test. 
+Analyze growth during the course of the stress test. 
 
 Test for effect of temperature: 
 ```{r, results=FALSE}
 #with full dataset 
-polypmod2<-glmer(Polyps ~ Treatment + Community + Community:Treatment + (1|Parent.Site/Genotype) + (1|Treatment:Tank) + (1|Slide), data=stress, family = poisson, subset=c(Timepoint=="S2D11"))
+#polypmod2<-glmer(Polyps ~ Treatment + Community + Community:Treatment + (1|Parent.Site/Genotype) + (1|Treatment:Tank) + (1|Slide), data=stress, family = poisson, subset=c(Timepoint=="S2D11"))
 
-summary(polypmod2)
-Anova(polypmod2, type="II")
-qqPlot(residuals(polypmod2))
+#summary(polypmod2)
+#Anova(polypmod2, type="II")
+#qqPlot(residuals(polypmod2))
 
 polypmod2a<-glmer(Polyps^2 ~ Day * Treatment * Community + (1|Parent.Site/Genotype) + (1|Treatment:Tank) + (1|Slide/Sample), data=stress, family = poisson)
 
@@ -661,14 +653,8 @@ polyp.effects2<-plot(eff.surv5,
 ```
 
  
-Analysis of multiple: 
+Present means of growth by number of juveniles. Sample size was too low due to mortality at the end of the experiment to calculate growth within multiple juvenile groups, so we pool these together for analysis here.  
 ```{r, results=FALSE}
-#with full dataset 
-polypmod2a<-glmer(Polyps^2 ~ Day * Fusion.Partners * Richness * Treatment + (1|Parent.Site/Genotype) + (1|Treatment:Tank) + (1|Slide/Sample), data=stress, family = poisson, subset=c(Community=="Multiple"))
-
-summary(polypmod2a)
-Anova(polypmod2a, type="II")
-qqPlot(residuals(polypmod2a))
 
 meanstressgrowth <- ddply(stress, c("Community", "Treatment", "Timepoint"), summarise,
                    N    = length(Polyps[!is.na(Polyps)]),
@@ -680,17 +666,6 @@ meanstressgrowth <- ddply(stress, c("Community", "Treatment", "Timepoint"), summ
                    upper = mean+sd
                    )
 meanstressgrowth
-
-meanstressgrowth2 <- ddply(multiple_final_stress, c("Treatment", "Fusion.Partners", "Richness"), summarise,
-                   N    = length(Polyps[!is.na(Polyps)]),
-                   mean = mean(Polyps, na.rm=TRUE),
-                   sd   = sd(Polyps, na.rm=TRUE),
-                   se   = sd / sqrt(N), 
-                   max = max(Polyps, na.rm=TRUE),
-                   lower = mean-sd, 
-                   upper = mean+sd
-                   )
-meanstressgrowth2
 ```
 
 
@@ -698,14 +673,14 @@ Combine figures for Stress Period
 ```{r, results=TRUE}
 stress_figs<-plot_grid(fuse.effects2, surv.effects3b2, surv.effects3, polyp.effects2, labels = c("A", "B", "C", "D"), ncol=4, nrow=1, rel_heights= c(1,1,1,1), rel_widths = c(0.6,1,1,1), label_size = 20, label_y=1, align="h");stress_figs
 
-ggsave(filename="Figures/New/stress_figs.png", plot=stress_figs, dpi=500, width=20, height=6, units="in")
+ggsave(filename="Figures/stress_figs.png", plot=stress_figs, dpi=500, width=20, height=6, units="in")
 ```
 
 
 ## 7. TEMPERATURE DATA
 
-Load in temperature data from Apex files.    
-
+Load in temperature data from Apex files. Data were recorded every 15 minutes and probes were calibrated to a digital thermometer weekly.     
+ 
 ```{r, restults=TRUE}
 juvtemps<-read.csv("Data/ApexTemps.csv", header=T, na.strings="NA")
 #convert Date and Time to date/time format
@@ -835,6 +810,7 @@ MeansJtemp2 <- ddply(juvtemps, c("Treatment"), summarise,
 MeansJtemp2
 ```
 
+Generate final figure.  
 
 ```{r, results=TRUE}
 JuvTempsDay<-ggplot(QuarterlyJ, aes(x = TimeDay, y = mean, color=Treatment, fill=Treatment)) + 
