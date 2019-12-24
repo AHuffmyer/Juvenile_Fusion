@@ -521,45 +521,8 @@ fuse.effects2<-plot(eff.fuse2,
                                               title=expression(bold("Temperature - \nGenotypic Richness")),
                                               cex=1, 
                                               cex.title=1)));fuse.effects2
-
-fusemod2b<-glmer(Fusion ~  Day * Treatment + (1|Parent.Site/Genotype) + (1|Treatment:Tank) + (1|Slide/Sample), data=stress, family=binomial, link=logit, subset=c(Community=="Multiple"))
-Anova(fusemod2b, type="II") 
-
-eff.fuse2b <- predictorEffect("Day", xlevels=4, fusemod2b, rug=TRUE)
-
-fuse.effects2b<-plot(eff.fuse2b,
-                   lines=list(multiline=TRUE, 
-                              col=c("blue", "red"), 
-                              lty=c(1)),
-                   confint=list(style="bands"), 
-                   lwd=4,
-                   axes=list(y=list(lim=c(0.8, 1))),
-                   type="response", 
-                   ylab=expression(bold("Prob(Successful Fusion)")), 
-                   legend.position="right",
-                   xlab=expression(bold("Time (Days)")), 
-                   main="",
-                   lattice=list(key.args=list(space="none",
-                                              border=FALSE, 
-                                              title=expression(bold("Temperature")),
-                                              cex=1, 
-                                              cex.title=1)));fuse.effects2b
-
 ```
 
-
-Analyze fusion as a product of treatment and genotypic richness at the end of the experiment.  
-```{r, results=TRUE}
-#with final dataset
-fusemod3<-glmer(Fusion ~ Treatment   + (1|Treatment:Tank) + (1|Parent.Site/Genotype) + (1|Slide), data=stress, link=logit, family=binomial, subset=c(Community=="Multiple" & Timepoint == "End"))
-summary(fusemod3)
-Anova(fusemod3, type="II") # no effects on rate of fusion by the end point
-
-plot(allEffects(fusemod3))
-
-dispersion_glmer(fusemod3) #no overdispersion
-plot(residuals(fusemod3)) + abline(h=0, lty=2)
-```
  
 ```{r, results=TRUE}
 meanstressfuse <- ddply(multiple_final_stress, c("Treatment", "Richness", "Timepoint"), summarise,
@@ -573,32 +536,8 @@ meanstressfuse <- ddply(multiple_final_stress, c("Treatment", "Richness", "Timep
                    )
 meanstressfuse
 ```
-  
- 
-```{r, results=TRUE}
 
-eff.fuse3 <- predictorEffect("Treatment", fusemod3, xlevels=4, rug=TRUE)
-
-fuse.effects3<-plot(eff.fuse3,
-                   lines=list(multiline=TRUE, 
-                              col=c("black"), 
-                              lty=c(1,2,4,3)),
-                   confint=list(style="bars"), 
-                   lwd=4,
-                   #axes=list(y=list(lim=c(0, 1))),
-                   type="response", 
-                   ylab=expression(bold("Prob(Successful Fusion)")), 
-                   legend.position="right",
-                   xlab=expression(bold("Temperature Treatment")), 
-                   main="",
-                   lattice=list(key.args=list(space="right",
-                                              border=FALSE, 
-                                              title=expression(bold("Genotypic \nRichness")),
-                                              cex=1, 
-                                              cex.title=1)));fuse.effects3
-```
-
-No effects at the end of the experiment, we will report full analysis over time during the stress test.    
+Fusion is decreased at the end of the experiment.     
 
 ## 6. STRESS GROWTH  
  
@@ -667,15 +606,15 @@ meanstressgrowth <- ddply(stress, c("Community", "Treatment", "Timepoint"), summ
                    )
 meanstressgrowth
 ```
-
+ 
 
 Combine figures for Stress Period
 ```{r, results=TRUE}
-stress_figs<-plot_grid(fuse.effects2, surv.effects3b2, surv.effects3, polyp.effects2, labels = c("A", "B", "C", "D"), ncol=4, nrow=1, rel_heights= c(1,1,1,1), rel_widths = c(0.6,1,1,1), label_size = 20, label_y=1, align="h");stress_figs
+stress_figs<-plot_grid(surv.effects3b2, surv.effects3, polyp.effects2, labels = c("A", "B", "C"), ncol=3, nrow=1, rel_heights= c(1,1,1), rel_widths = c(1,1,1), label_size = 20, label_y=1, align="h");stress_figs
 
 ggsave(filename="Figures/stress_figs.png", plot=stress_figs, dpi=500, width=20, height=6, units="in")
 ```
-
+ 
 
 ## 7. TEMPERATURE DATA
 
