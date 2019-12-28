@@ -82,7 +82,7 @@ multiple_final<-multiple[which(multiple$Timepoint == "Final"),]
 
 ### **Analysis**  
 
-Analyze with a logistic binomial regression model.  
+Analyze with a logistic binomial regression model.   
 
 Analyze at the final timepoint.  
 ```{r, results=TRUE}
@@ -331,6 +331,7 @@ final_stress<-stress[which(stress$Timepoint == "End"),]
 multiple_stress<-stress[which(stress$Community == "Multiple"),]
 multiple_final_stress<-multiple_stress[which(multiple_stress$Timepoint == "End"),]
 d26_stress<-stress[which(stress$Timepoint == "S2D11"),]
+d23_stress<-stress[which(stress$Timepoint == "S2D8"),]
 ```
 
 ### **Analysis**  
@@ -431,7 +432,7 @@ Create plot for effect of temperature on survival in multiple juvenile groups ac
 ```{r, results=TRUE}
 stress$group<-paste(stress$Treatment, "-", stress$Fusion.Partners)
 
-survmod3a<-glmer(Survivorship ~ Day * group + (1|Parent.Site/Colony) + (1|Treatment:Tank) + (1|Slide/Sample), data=stress, family=binomial, link=logit)
+survmod3a<-glmer(Survivorship ~ Day * group + (1|Parent.Site/Colony) + (1|Treatment:Tank) + (1|Slide), data=stress, family=binomial)
 
 summary(effect(c("Day", "group"), xlevels=50, survmod3a))
 
@@ -479,11 +480,11 @@ meanstresssurv2
 
 Analyze with a logistic binomial regression model.    
 
-Analyze fusion success over the course of the stress test.  
+Analyze fusion success over the course of the stress test.   
 
 ```{r, results=FALSE}
 #with full
-fusemod2<-glmer(Fusion ~  Day * Treatment * Richness + (1|Parent.Site/Colony) + (1|Treatment:Tank) + (1|Slide/Sample), data=stress, family=binomial, link=logit, subset=c(Community=="Multiple"))
+fusemod2<-glmer(Fusion ~  Day * Treatment * Richness + (1|Parent.Site/Colony) + (1|Treatment:Tank) + (1|Slide/Sample), data=stress, family=binomial, link=logit, subset=c(Community=="Multiple")) 
 
 summary(fusemod2)
 Anova(fusemod2, type="II") 
@@ -517,7 +518,7 @@ Analyze with a poisson regression model.
 Analyze growth during the course of the stress test.  
 
 Test for effect of temperature: 
-```{r, results=FALSE}
+```{r, results=TRUE}
 #with full dataset 
 #polypmod2<-glmer(Polyps ~ Treatment + Community + Community:Treatment + (1|Parent.Site/Genotype) + (1|Treatment:Tank) + (1|Slide), data=stress, family = poisson, subset=c(Timepoint=="S2D11"))
 
@@ -565,7 +566,7 @@ polyp.effects2<-plot(eff.surv5,
 
 
 Present means of growth by number of juveniles. Sample size was too low due to mortality at the end of the experiment to calculate growth within multiple juvenile groups, so we pool these together for analysis here.  
-```{r, results=FALSE}
+```{r, results=TRUE}
 
 meanstressgrowth <- ddply(stress, c("Day", "Community", "Treatment"), summarise,
                    N    = length(Polyps[!is.na(Polyps)]),
@@ -577,11 +578,77 @@ meanstressgrowth <- ddply(stress, c("Day", "Community", "Treatment"), summarise,
                    upper = mean+sd
                    )
 meanstressgrowth
+
+meanstressgrowth2 <- ddply(stress, c("Day", "Treatment"), summarise,
+                   N    = length(Polyps[!is.na(Polyps)]),
+                   mean = mean(Polyps, na.rm=TRUE),
+                   sd   = sd(Polyps, na.rm=TRUE),
+                   se   = sd / sqrt(N), 
+                   max = max(Polyps, na.rm=TRUE),
+                   lower = mean-sd, 
+                   upper = mean+sd
+                   )
+meanstressgrowth2
 ```
 
-Combine figures for Stress Period
+
+Next, analyze the effect of temperature on growth (polyp expansion) at day 23 of 32 during the thermal stress test. As seen in table above, this is the timepoint with sufficient sample size, as later timepoints had high mortality.  
+
+First, for the effect of community type (individual vs multiple). No need to square transform as residuals are normal on scale of raw data.  
 ```{r, results=TRUE}
-stress_figs<-plot_grid(surv.effects3b2, surv.effects3, polyp.effects2, labels = c("A", "B", "C"), ncol=3, nrow=1, rel_heights= c(1,1,1), rel_widths = c(1,1,1), label_size = 20, label_y=1, align="h");stress_figs
+polypmod3a<-glmer(Polyps ~ Treatment * Community + (1|Parent.Site/Colony) + (1|Treatment:Tank) + (1|Slide), data=d23_stress, family = poisson)
+
+summary(polypmod3a)
+Anova(polypmod3a, type="II")
+qqPlot(residuals(polypmod3a))
+```
+
+There was no difference in growth between individual and multiple juvenile groups, but an effect of temperature was significant. Next, analyze within multiple juvenile groups to look for effect of richness and fusion. 
+
+Generate a plot of this relationship.  
+
+```{r, results=TRUE}
+d23_stress$group<-paste(d23_stress$Treatment, "-", d23_stress$Community)
+
+polypmod3a2<-glmer(Polyps ~ Treatment + (1|Parent.Site/Colony) + (1|Treatment:Tank) + (1|Slide), data=d23_stress, family = poisson)
+
+eff.stress.polyps1 <- predictorEffect("Treatment", polypmod3a2)
+polyps.stress.effects1<-plot(eff.stress.polyps1,
+                   lines=list(multiline=TRUE, 
+                              col=c("black"), 
+                              lty=1), 
+                   confint=list(style="bars", width=4, col="black"), 
+                   lwd=4,
+                   axes=list(y=list(lim=c(5,8))),
+                   type="response", 
+                   ylab=expression(bold("Polyp Expansion")), 
+                   legend.position="right",
+                   xlab=expression(bold("Temperature")), 
+                   main=""); polyps.stress.effects1
+                   #lattice=list(key.args=list(space="right",
+                                              #border=FALSE, 
+                                              #title=expression(bold("Genotypic \nRichness")),
+                                              #cex=1, 
+                                              #cex.title=1)));surv.effects1
+
+```
+
+
+
+```{r, results=TRUE}
+polypmod3b<-glmer(Polyps ~ Treatment * Richness * Fusion.Partners + (1|Parent.Site/Colony) + (1|Treatment:Tank) + (1|Slide), data=d23_stress, family = poisson, subset=c(Community=="Multiple"))
+
+summary(polypmod3b)
+Anova(polypmod3b, type="II")
+qqPlot(residuals(polypmod3b))
+``` 
+
+There is no effect of fusion or genotypic richness on growth.   
+
+Combine figures for Stress Period:  
+
+```{r, results=TRUE}
+stress_figs<-plot_grid(surv.effects3b2, surv.effects3, polyps.stress.effects1, labels = c("A", "B", "C"), ncol=3, nrow=1, rel_heights= c(1,1,1), rel_widths = c(1,1,0.8), label_size = 20, label_y=1, align="h");stress_figs
 
 ggsave(filename="Figures/stress_figs.png", plot=stress_figs, dpi=500, width=20, height=6, units="in")
 ```
