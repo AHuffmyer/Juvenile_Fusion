@@ -533,15 +533,6 @@ qqPlot(residuals(polypmod2a))
 
 ```
 
-Analyze within multiple juvenile groups: 
-```{r, results=FALSE}
-polypmod3<-glmer(Polyps^2 ~ Day * Treatment * Fusion.Partners * Richness + (1|Parent.Site/Colony) + (1|Treatment:Tank) + (1|Slide/Sample), data=stress, family = poisson, subset=c(Community==c("Multiple")))
-
-summary(polypmod3)
-Anova(polypmod3, type="II")
-qqPlot(residuals(polypmod3))
-```
-
 
 Plot difference in temperature between single and multiple groups:    
 
@@ -573,11 +564,10 @@ polyp.effects2<-plot(eff.surv5,
 ```
 
 
-
 Present means of growth by number of juveniles. Sample size was too low due to mortality at the end of the experiment to calculate growth within multiple juvenile groups, so we pool these together for analysis here.  
 ```{r, results=FALSE}
 
-meanstressgrowth <- ddply(final_stress, c("Community", "Treatment","Fusion.Partners"), summarise,
+meanstressgrowth <- ddply(stress, c("Day", "Community", "Treatment"), summarise,
                    N    = length(Polyps[!is.na(Polyps)]),
                    mean = mean(Polyps, na.rm=TRUE),
                    sd   = sd(Polyps, na.rm=TRUE),
