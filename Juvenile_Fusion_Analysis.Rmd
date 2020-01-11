@@ -14,7 +14,7 @@ output:
 ---
 
 ## Setup   
-
+ 
 Set up workspace, set options, and load required packages. 
 ```{r, echo=TRUE, show=FALSE}
 rm(list=ls(all=TRUE)) 
@@ -53,7 +53,7 @@ library(survminer)
 ```
  
 ## 1. GROW OUT SURVIVORSHIP  
-### **Load data**    
+### **Load data**     
 
 Survivorship is measured as binary on each individual spat in the experiment.    
 
@@ -62,17 +62,18 @@ Survivorship is measured as binary on each individual spat in the experiment.
 rearing<-read.csv("Data/GrowOut_Responses_PostGenotyping.csv", header=TRUE, sep=",", na.strings="NA")
 rearing$Quadrant<-as.factor(rearing$Quadrant)
 rearing$Diversity.Type<-relevel(rearing$Diversity.Type, ref="Individual")
+rearing$Community<-relevel(rearing$Community, ref="Individual")
 
 #rearing$Total.Juveniles<-as.factor(rearing$Total.Juveniles)
 #rearing$Fusion.Partners<-as.factor(rearing$Fusion.Partners)
 #rearing$Richness<-as.factor(rearing$Richness)
 ```
 
-Subset the final timepoint for additional analyses.  
+Subset the final timepoint for additional analyses.   
 ```{r, results=TRUE}
 final<-rearing[which(rearing$Timepoint == "Final"),]
-multiple<-rearing[which(rearing$Community == "Multiple"),]
-multiple_final<-multiple[which(multiple$Timepoint == "Final"),]
+group<-rearing[which(rearing$Community == "Group"),]
+group_final<-group[which(group$Timepoint == "Final"),]
 ```
 
 ### **Analysis**  
@@ -121,7 +122,7 @@ surv.effects1<-plot(eff.surv1,
 
 Create plots for fusion partner effects.  
 ```{r, results=TRUE}
-survmod2a<-glmer(Survivorship ~ Richness + Fusion.Partners + Richness:Fusion.Partners + (1|Parent.Site/Colony) + (1|Tank) + (1|Slide), data=final, family=binomial, subset=c(Community=="Multiple"))
+survmod2a<-glmer(Survivorship ~ Richness + Fusion.Partners + Richness:Fusion.Partners + (1|Parent.Site/Colony) + (1|Tank) + (1|Slide), data=final, family=binomial, subset=c(Community=="Group"))
 
 eff.surv2 <- predictorEffect("Fusion.Partners", survmod2a, xlevels=4, rug=TRUE)
 surv.effects2<-plot(eff.surv2,
@@ -143,7 +144,7 @@ surv.effects2<-plot(eff.surv2,
                                               cex.title=1)));surv.effects2
 
 
-survmod2b<-glmer(Survivorship ~ Fusion.Partners + (1|Parent.Site/Colony) + (1|Tank) + (1|Slide), data=final, family=binomial, subset=c(Community=="Multiple"))
+survmod2b<-glmer(Survivorship ~ Fusion.Partners + (1|Parent.Site/Colony) + (1|Tank) + (1|Slide), data=final, family=binomial, subset=c(Community=="Group"))
 
 eff.surv2b <- predictorEffect("Fusion.Partners", survmod2b, xlevels=4, rug=TRUE)
 surv.effects2b<-plot(eff.surv2b,
@@ -165,7 +166,7 @@ surv.effects2b<-plot(eff.surv2b,
                                               cex.title=1)));surv.effects2b
 ```
 
-Generate mean values of survivorship for 1) number of juveniles and 2) within "multiple" juvenile groups, mean values for number of fusion partners.   
+Generate mean values of survivorship for 1) number of juveniles and 2) within "group" juveniles, mean values for number of fusion partners.   
 ```{r, results=TRUE}
 
 meansurv <- ddply(final, c("Community"), summarise,
@@ -179,7 +180,7 @@ meansurv <- ddply(final, c("Community"), summarise,
                    )
 meansurv
 
-meansurv2 <- ddply(multiple_final, c("Fusion.Partners"), summarise,
+meansurv2 <- ddply(group_final, c("Fusion.Partners"), summarise,
                    N    = length(Survivorship[!is.na(Survivorship)]),
                    mean = mean(Survivorship, na.rm=TRUE),
                    sd   = sd(Survivorship, na.rm=TRUE),
@@ -190,7 +191,7 @@ meansurv2 <- ddply(multiple_final, c("Fusion.Partners"), summarise,
                    )
 meansurv2
 
-meansurv3 <- ddply(multiple_final, c("Richness"), summarise,
+meansurv3 <- ddply(group_final, c("Richness"), summarise,
                    N    = length(Survivorship[!is.na(Survivorship)]),
                    mean = mean(Survivorship, na.rm=TRUE),
                    sd   = sd(Survivorship, na.rm=TRUE),
@@ -211,10 +212,10 @@ Analyze with a logistic binomial regression model.
 
 Final timepoint dataset. 
 
-Analyze fusion as a product of genotypic richness within "multiple" juvenile groups.   
+Analyze fusion as a product of genotypic richness within "group" juveniles.   
 ```{r, results=FALSE}
 #with final dataset
-fusemod1<-glmer(Fusion ~ Richness + (1|Parent.Site/Colony) + (1|Tank) + (1|Slide), data=final, family=binomial, subset=c(Community=="Multiple"))
+fusemod1<-glmer(Fusion ~ Richness + (1|Parent.Site/Colony) + (1|Tank) + (1|Slide), data=final, family=binomial, subset=c(Community=="Group"))
 summary(fusemod1)
 Anova(fusemod1, type="II") # no effects on rate of fusion by the end point
 
@@ -246,7 +247,7 @@ fuse.effects1<-plot(eff.fuse1,
 Generate a summary of proportion fused at the end of the grow-out period.  
 
 ```{r, results=TRUE}
-meanfusion <- ddply(multiple_final, c("Richness"), summarise,
+meanfusion <- ddply(group_final, c("Richness"), summarise,
                    N    = length(Fusion[!is.na(Fusion)]),
                    mean = mean(Fusion, na.rm=TRUE),
                    sd   = sd(Fusion, na.rm=TRUE),
@@ -256,7 +257,6 @@ meanfusion <- ddply(multiple_final, c("Richness"), summarise,
                    upper = mean+sd
                    )
 meanfusion
-
 ```
 
 
@@ -265,7 +265,7 @@ meanfusion
 
 Growth is measured as polyp expansion in each spat by number of spat in each sibling type and number of fused individuals. Growth is measured in final dataset as all spat started with 1 polyp each.    
 
-Analyze polyp expansion with the final dataset and present means.      
+Analyze polyp expansion with the final dataset and present means.       
  
 ```{r, results=TRUE}
 polypmod1<-glmer(Polyps ~ Richness + Community + Fusion.Partners + Richness:Fusion.Partners + (1|Parent.Site/Colony) + (1|Tank) + (1|Slide), data=final, family = poisson)
@@ -312,9 +312,9 @@ polyp.effects1<-plot(eff.polyps1,
 
 Combine figures for Grow-Out Period.  
 ```{r, results=TRUE}
-grow_out_figs<-plot_grid(surv.effects1, surv.effects2b, labels = c("A", "B"), ncol=2, nrow=1, rel_heights= c(1,1), rel_widths = c(0.8,1), label_size = 20, label_y=1, align="h");grow_out_figs
+grow_out_figs<-plot_grid(surv.effects2b, labels = c(""), ncol=1, nrow=1, rel_heights= c(1), rel_widths = c(1), label_size = 20, label_y=1, align="h");grow_out_figs
 
-ggsave(filename="Figures/grow_out_figs.png", plot=grow_out_figs, dpi=500, width=10, height=6, units="in")
+ggsave(filename="Figures/grow_out_figs.png", plot=grow_out_figs, dpi=500, width=8, height=8, units="in")
 ```
 
 
@@ -327,6 +327,7 @@ Survivorship is measured as binary on each individual spat in the experiment.
 #load data
 stress<-read.csv("Data/Stress_Responses_PostGenotyping.csv", header=TRUE, sep=",", na.strings="NA")
 stress$Diversity.Type<-relevel(stress$Diversity.Type, ref="Individual")
+stress$Community<-relevel(stress$Community, ref="Individual")
 stress$Polyps<-as.numeric(stress$Polyps)
 stress$Fusion.Type<-relevel(stress$Fusion.Type, ref="Not Fused")
 stress$Richness.Type<-relevel(stress$Richness.Type, ref="Single")
@@ -335,13 +336,13 @@ stress$Richness.Type<-relevel(stress$Richness.Type, ref="Single")
 stressdrop<-droplevels(stress[!stress$Fusion.Type == 'Not Fused',])
 ``` 
 
-Subset the final timepoint, "multiple" juvenile datasets for additional analyses.  
+Subset the final timepoint, "group" juvenile datasets for additional analyses.  
 ```{r, results=FALSE}
 final_stress<-stress[which(stress$Timepoint == "End"),]
 final_stress_drop<-stressdrop[which(stressdrop$Timepoint == "End"),]
-multiple_stress<-stress[which(stress$Community == "Multiple"),]
-multiple_final_stress<-multiple_stress[which(multiple_stress$Timepoint == "End"),]
-multiple_d26_stress<-multiple_stress[which(multiple_stress$Timepoint == "S2D11"),]
+group_stress<-stress[which(stress$Community == "Group"),]
+group_final_stress<-group_stress[which(group_stress$Timepoint == "End"),]
+group_d26_stress<-group_stress[which(group_stress$Timepoint == "S2D11"),]
 d26_stress<-stress[which(stress$Timepoint == "S2D11"),]
 d23_stress<-stress[which(stress$Timepoint == "S2D8"),]
 ``` 
@@ -352,7 +353,7 @@ Analyze with a logistic binomial regression model.
 
 Analyze survivorship during the stress test as survivorship as a function of fusion status and genotypic richness. Fusion is classified as "Fused" or "Not Fused" at the beginning of the stress test. Genotypic richness is classified as "single" genotype or "multiple" genotypes. This is to maximize sample size due to mortality and low sample size within levels of fusion partners and genotypic richness. Individuals are referred to as "individuals". 
 
-First, examine sample size of groups. As there were very few "not fused" individuals in multiple juvenile slides, these will be removed from the analysis. We will only analyze survivorship of "individuals" and those which are "fused". We will then examine the differences between "single" and "multiple" genotype groups.  
+First, examine sample size of groups. As there were very few "not fused" individuals in group juvenile slides, these will be removed from the analysis. We will only analyze survivorship of "individuals" and those which are "fused". We will then examine the differences between "single" and "multiple" genotype groups.  
 
 ```{r, results=TRUE}
 meanstresssurv1 <- ddply(stress, c("Fusion.Type", "Diversity.Type", "Day", "Treatment"), summarise,
