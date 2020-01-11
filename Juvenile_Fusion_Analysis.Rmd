@@ -383,7 +383,7 @@ meanstresssurv2 <- ddply(stressdrop, c("Fusion.Type", "Diversity.Type", "Day", "
 meanstresssurv2
 ```
 
-Now that the "not fused" group is removed, analyze the effect of richness, fusion, and treatment on survivorship over the course of the stress test. Note that there is no interaction between richness type and fusion type as individual juveniles are not exposed to other juveniles and therefore no option for genotypic richness.  
+Now that the "not fused" group is removed, analyze the effect of richness, fusion, and treatment on survivorship over the course of the stress test. Note that there is no interaction between richness type and fusion type as individual juveniles are not exposed to other juveniles and therefore no option for genotypic richness.   
 
 ```{r, results=TRUE}
 stressmod1<-glmer(Survivorship ~ Day + Treatment + Fusion.Type + Richness.Type + Day:Treatment + Day:Fusion.Type + Day:Richness.Type + Day:Treatment:Fusion.Type + Day:Treatment:Richness.Type + Treatment:Fusion.Type + Treatment:Richness.Type + (1|Parent.Site/Colony) + (1|Treatment:Tank) + (1|Slide), data=stressdrop, family=binomial, link=logit) 
