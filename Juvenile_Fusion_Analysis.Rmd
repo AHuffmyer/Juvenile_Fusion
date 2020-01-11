@@ -20,11 +20,6 @@ Set up workspace, set options, and load required packages.
 rm(list=ls(all=TRUE)) 
 ```
 
-```{r setup, echo=TRUE}
-knitr::opts_chunk$set(root.dir = "~/R",warning=FALSE, message=FALSE)
-```
-
-
 ```{r, echo=TRUE, warnings=FALSE}
 library(gridExtra)
 library(multcomp)
@@ -60,7 +55,7 @@ library(survminer)
 ## 1. GROW OUT SURVIVORSHIP  
 ### **Load data**    
 
-Survivorship is measured as binary on each individual spat in the experiment.   
+Survivorship is measured as binary on each individual spat in the experiment.    
 
 ```{r, results=TRUE}
 #load data
@@ -195,11 +190,22 @@ meansurv2 <- ddply(multiple_final, c("Fusion.Partners"), summarise,
                    )
 meansurv2
 
+meansurv3 <- ddply(multiple_final, c("Richness"), summarise,
+                   N    = length(Survivorship[!is.na(Survivorship)]),
+                   mean = mean(Survivorship, na.rm=TRUE),
+                   sd   = sd(Survivorship, na.rm=TRUE),
+                   se   = sd / sqrt(N), 
+                   max = max(Survivorship, na.rm=TRUE),
+                   lower = mean-sd, 
+                   upper = mean+sd
+                   )
+meansurv3
+
 ```
 
 ## 2. GROW OUT FUSION
 
-### **Analysis**   
+### **Analysis**    
 
 Analyze with a logistic binomial regression model.  
 
@@ -259,7 +265,7 @@ meanfusion
 
 Growth is measured as polyp expansion in each spat by number of spat in each sibling type and number of fused individuals. Growth is measured in final dataset as all spat started with 1 polyp each.    
 
-Analyze polyp expansion with the final dataset and present means.     
+Analyze polyp expansion with the final dataset and present means.      
  
 ```{r, results=TRUE}
 polypmod1<-glmer(Polyps ~ Richness + Community + Fusion.Partners + Richness:Fusion.Partners + (1|Parent.Site/Colony) + (1|Tank) + (1|Slide), data=final, family = poisson)
@@ -313,44 +319,43 @@ ggsave(filename="Figures/grow_out_figs.png", plot=grow_out_figs, dpi=500, width=
 
 
 ## 4. STRESS SURVIVORSHIP
-### **Load data**    
+### **Load data**     
 
-Survivorship is measured as binary on each individual spat in the experiment. 
+Survivorship is measured as binary on each individual spat in the experiment.  
  
 ```{r, results=TRUE}
 #load data
 stress<-read.csv("Data/Stress_Responses_PostGenotyping.csv", header=TRUE, sep=",", na.strings="NA")
 stress$Diversity.Type<-relevel(stress$Diversity.Type, ref="Individual")
 stress$Polyps<-as.numeric(stress$Polyps)
+stress$Fusion.Type<-relevel(stress$Fusion.Type, ref="Not Fused")
+stress$Richness.Type<-relevel(stress$Richness.Type, ref="Single")
 
+#remove non-fused from analysis 
+stressdrop<-droplevels(stress[!stress$Fusion.Type == 'Not Fused',])
 ``` 
 
 Subset the final timepoint, "multiple" juvenile datasets for additional analyses.  
-```{r, results=TRUE}
+```{r, results=FALSE}
 final_stress<-stress[which(stress$Timepoint == "End"),]
+final_stress_drop<-stressdrop[which(stressdrop$Timepoint == "End"),]
 multiple_stress<-stress[which(stress$Community == "Multiple"),]
 multiple_final_stress<-multiple_stress[which(multiple_stress$Timepoint == "End"),]
+multiple_d26_stress<-multiple_stress[which(multiple_stress$Timepoint == "S2D11"),]
 d26_stress<-stress[which(stress$Timepoint == "S2D11"),]
 d23_stress<-stress[which(stress$Timepoint == "S2D8"),]
-```
+``` 
 
 ### **Analysis**  
 
-Analyze with a logistic binomial regression model. 
+Analyze with a logistic binomial regression model.  
 
-Check for effect of community type ("individual" or "multiple" juveniles) on survivorship and display means.    
+Analyze survivorship during the stress test as survivorship as a function of fusion status and genotypic richness. Fusion is classified as "Fused" or "Not Fused" at the beginning of the stress test. Genotypic richness is classified as "single" genotype or "multiple" genotypes. This is to maximize sample size due to mortality and low sample size within levels of fusion partners and genotypic richness. Individuals are referred to as "individuals". 
+
+First, examine sample size of groups. As there were very few "not fused" individuals in multiple juvenile slides, these will be removed from the analysis. We will only analyze survivorship of "individuals" and those which are "fused". We will then examine the differences between "single" and "multiple" genotype groups.  
 
 ```{r, results=TRUE}
-#with full time dataset
-survmod3b<-glmer(Survivorship ~ Day * Treatment * Community + (1|Parent.Site/Colony) + (1|Treatment:Tank) + (1|Slide), data=stress, family=binomial, link=logit) 
-
-summary(survmod3b)
-Anova(survmod3b, type="II")
-
-dispersion_glmer(survmod3b) #no overdispersion
-plot(residuals(survmod3b)) + abline(h=0, lty=2) #Dispersed randomly
-
-meanstresssurv1 <- ddply(final_stress, c("Community", "Treatment"), summarise,
+meanstresssurv1 <- ddply(stress, c("Fusion.Type", "Diversity.Type", "Day", "Treatment"), summarise,
                    N    = length(Survivorship[!is.na(Survivorship)]),
                    mean = mean(Survivorship, na.rm=TRUE),
                    sd   = sd(Survivorship, na.rm=TRUE),
@@ -360,27 +365,13 @@ meanstresssurv1 <- ddply(final_stress, c("Community", "Treatment"), summarise,
                    upper = mean+sd
                    )
 meanstresssurv1
-
 ```
 
+Display means with the not fused group removed.  
 
-Analyze within "multiple" groups as survival was significantly different between single and multiple juvenile slides.  
 ```{r, results=TRUE}
-#with full time dataset
 
-survmod3<-glmer(Survivorship ~ Day + Treatment + Fusion.Partners + Richness + Day:Treatment + Day:Fusion.Partners + Day:Richness + Day:Treatment:Fusion.Partners + Day:Treatment:Richness + Day:Fusion.Partners:Richness:Treatment + (1|Parent.Site/Colony) + (1|Treatment:Tank) + (1|Slide/Sample), data=stress, family=binomial, subset=c(Community=="Multiple")) 
-
-#fixed_form<-glm(Survivorship ~ Day * Treatment * Fusion.Partners *Richness, data=stress, family=binomial, subset=c(Community=="Multiple"))
-
-#library("brglm2"); glm(fixed_form, data = stress, family = binomial, method="detect_separation")
-
-summary(survmod3)
-Anova(survmod3, type="II")
-
-dispersion_glmer(survmod3) #no overdispersion
-plot(residuals(survmod3)) + abline(h=0, lty=2) #Dispersed randomly
-
-meanstresssurv2 <- ddply(final_stress, c("Fusion.Partners", "Treatment"), summarise,
+meanstresssurv2 <- ddply(stressdrop, c("Fusion.Type", "Diversity.Type", "Day", "Treatment"), summarise,
                    N    = length(Survivorship[!is.na(Survivorship)]),
                    mean = mean(Survivorship, na.rm=TRUE),
                    sd   = sd(Survivorship, na.rm=TRUE),
@@ -392,19 +383,30 @@ meanstresssurv2 <- ddply(final_stress, c("Fusion.Partners", "Treatment"), summar
 meanstresssurv2
 ```
 
-Plot effect of number of juveniles over time.  
+Now that the "not fused" group is removed, analyze the effect of richness, fusion, and treatment on survivorship over the course of the stress test. Note that there is no interaction between richness type and fusion type as individual juveniles are not exposed to other juveniles and therefore no option for genotypic richness.  
 
 ```{r, results=TRUE}
+stressmod1<-glmer(Survivorship ~ Day + Treatment + Fusion.Type + Richness.Type + Day:Treatment + Day:Fusion.Type + Day:Richness.Type + Day:Treatment:Fusion.Type + Day:Treatment:Richness.Type + Treatment:Fusion.Type + Treatment:Richness.Type + (1|Parent.Site/Colony) + (1|Treatment:Tank) + (1|Slide), data=stressdrop, family=binomial, link=logit) 
 
-stress$group<-paste(stress$Treatment, "-", stress$Community)
+summary(stressmod1)
+Anova(stressmod1, type="II")
+dispersion_glmer(stressmod1) #no overdispersion
+```
 
-survmod3b2<-glmer(Survivorship ~ group * Day + (1|Parent.Site/Colony) + (1|Treatment:Tank) + (1|Slide), data=stress, family=binomial, link=logit) 
+There is a significant interaction between treatment and fusion as well as treatment and richness First plot the effect of fusion.  
 
-eff.surv3b2 <- predictorEffect(c("Day"), survmod3b2)
-surv.effects3b2<-plot(eff.surv3b2,
+```{r, results=TRUE}
+#generate model for effect plot  
+stressdrop$group<-paste(stressdrop$Treatment, "-", stressdrop$Fusion.Type)
+
+stressmod2<-glmer(Survivorship ~ Day * group + (1|Parent.Site/Colony) + (1|Treatment:Tank) + (1|Slide), data=stressdrop, family=binomial, link=logit) 
+
+eff.stress2 <- predictorEffect(c("Day"), stressmod2)
+
+stress.effectsFUSE<-plot(eff.stress2,
                    lines=list(multiline=TRUE, 
                               col=c("blue", "blue", "red", "red"), 
-                              lty=c(1, 2, 1, 2)), 
+                              lty=c(2,1,2,1)), 
                    confint=list(style="bands", alpha=0.1), 
                    lwd=4,
                    axes=list(y=list(lim=c(0, 1.1))),
@@ -415,32 +417,36 @@ surv.effects3b2<-plot(eff.surv3b2,
                    main="",
                    lattice=list(key.args=list(space="top",
                                               border=FALSE, 
-                                              title=expression(bold("Temperature - Number of Juveniles")),
+                                              title=expression(bold("Temperature - Fusion")),
                                               cex=1, 
-                                              cex.title=1)));surv.effects3b2
-
+                                              cex.title=1)));stress.effectsFUSE
 ```
 
-Examine curve estimates to identify 50% survivorship.  
+Obtain effect summary for effects of fusion.  
 
 ```{r, results=TRUE}
-summary(effect(c("group", "Day"), xlevels=50, survmod3b2))
+summary(effect(c("Day", "group"), xlevels=50, stressmod2))
 ```
 
-Create plot for effect of temperature on survival in multiple juvenile groups across number of fusion partners.  
+The curves for high temperature meet 50% at the following timepoints:  
+
+High individual = ~ 20.4 days   
+High fused = ~ 25.5 days   
+
+50% mortality (LT50) is approximately 5 days later for fused corals than for individuals in this stress test.  
+
+Next plot the effect of genotypic richness within the fused corals.  
 
 ```{r, results=TRUE}
-stress$group<-paste(stress$Treatment, "-", stress$Fusion.Partners)
+stressdrop$group<-paste(stressdrop$Treatment, "-", stressdrop$Richness.Type)
 
-survmod3a<-glmer(Survivorship ~ Day * group + (1|Parent.Site/Colony) + (1|Treatment:Tank) + (1|Slide), data=stress, family=binomial)
+stressmod3<-glmer(Survivorship ~ Day * group + (1|Parent.Site/Colony) + (1|Treatment:Tank) + (1|Slide), data=stressdrop, family=binomial, link=logit, subset=c(Fusion.Type=="Fused")) 
 
-summary(effect(c("Day", "group"), xlevels=50, survmod3a))
-
-eff.surv3 <- predictorEffect(c("Day"), survmod3a)
-surv.effects3<-plot(eff.surv3,
+eff.stress3 <- predictorEffect(c("Day"), stressmod3)
+stress.effectsRICHNESS<-plot(eff.stress3,
                    lines=list(multiline=TRUE, 
-                              col=c("blue", "blue", "blue", "blue", "red", "red", "red", "red"), 
-                              lty=c(1, 2, 4, 3, 1, 2, 4, 3)), 
+                              col=c("blue", "blue", "red", "red"), 
+                              lty=c(2,1,2,1)), 
                    confint=list(style="bands", alpha=0.1), 
                    lwd=4,
                    axes=list(y=list(lim=c(0, 1.1))),
@@ -451,53 +457,48 @@ surv.effects3<-plot(eff.surv3,
                    main="",
                    lattice=list(key.args=list(space="top",
                                               border=FALSE, 
-                                              title=expression(bold("Temperature - Fusion Partners")),
+                                              title=expression(bold("Temperature - Genotypic Richness")),
                                               cex=1, 
-                                              cex.title=1)));surv.effects3
-
+                                              cex.title=1)));stress.effectsRICHNESS
 ```
 
-
-Display mean survivorship within multiple juvenile groups at the end of the experiment.  
+Obtain effect summary for effects of richness.  
 
 ```{r, results=TRUE}
-meanstresssurv2 <- ddply(multiple_final_stress, c("Fusion.Partners", "Treatment"), summarise,
-                   N    = length(Survivorship[!is.na(Survivorship)]),
-                   mean = mean(Survivorship, na.rm=TRUE),
-                   sd   = sd(Survivorship, na.rm=TRUE),
-                   se   = sd / sqrt(N), 
-                   max = max(Survivorship, na.rm=TRUE),
-                   lower = mean-sd, 
-                   upper = mean+sd
-                   )
-meanstresssurv2
-
+summary(effect(c("Day", "group"), xlevels=50, stressmod3))
 ```
+
+The curves for high temperature meet 50% at the following timepoints:  
+
+High multiple = ~ 26 days   
+High single = ~ 24.5 days   
+
+50% mortality (LT50) is approximately 1.5 days later for multiple genotype fusions than for single genotype fusions in this stress test.  
+
 
 ## 5. STRESS FUSION  
 
-### **Analysis**   
+### **Analysis**    
+ 
+Analyze with a logistic binomial regression model.      
 
-Analyze with a logistic binomial regression model.    
-
-Analyze fusion success over the course of the stress test.   
+Analyze fusion success by the end of the stress test within fused corals by treatment and genotypic richness.     
 
 ```{r, results=FALSE}
-#with full
-fusemod2<-glmer(Fusion ~  Day * Treatment * Richness + (1|Parent.Site/Colony) + (1|Treatment:Tank) + (1|Slide/Sample), data=stress, family=binomial, link=logit, subset=c(Community=="Multiple")) 
+stressfuse1<-glmer(Fusion ~ Treatment * Richness.Type + (1|Parent.Site/Colony) + (1|Treatment:Tank) + (1|Slide), data=final_stress_drop, family=binomial, link=logit, subset=c(Fusion.Type=="Fused")) 
 
-summary(fusemod2)
-Anova(fusemod2, type="II") 
+summary(stressfuse1)
+Anova(stressfuse1, type="II") 
 
-plot(allEffects(fusemod2))
+plot(allEffects(stressfuse1))
 
-dispersion_glmer(fusemod2) #no overdispersion
-plot(residuals(fusemod2)) + abline(h=0, lty=2)
+dispersion_glmer(stressfuse1) #no overdispersion
+
 ```
 
 
 ```{r, results=TRUE}
-meanstressfuse <- ddply(multiple_final_stress, c("Treatment", "Richness", "Timepoint"), summarise,
+meanstressfuse <- ddply(final_stress_drop, c("Treatment", "Richness.Type"), summarise,
                    N    = length(Fusion[!is.na(Fusion)]),
                    mean = mean(Fusion, na.rm=TRUE),
                    sd   = sd(Fusion, na.rm=TRUE),
@@ -509,66 +510,18 @@ meanstressfuse <- ddply(multiple_final_stress, c("Treatment", "Richness", "Timep
 meanstressfuse
 ```
 
-Fusion is decreased at the end of the experiment.     
+There is no effect of treatment or richness on fusion sucess. There is a trend for slightly lower fusion in high temperature, but this was not significant.       
 
 ## 6. STRESS GROWTH  
  
-Analyze with a poisson regression model.    
+Analyze with a poisson regression model.     
 
-Analyze growth during the course of the stress test.  
+Analyze growth as polyp expansion at day 23 of 32 of the stress test. Due to high mortality, this is the last time point with suffficient sample size to measure growth.   
 
-Test for effect of temperature: 
-```{r, results=TRUE}
-#with full dataset 
-#polypmod2<-glmer(Polyps ~ Treatment + Community + Community:Treatment + (1|Parent.Site/Genotype) + (1|Treatment:Tank) + (1|Slide), data=stress, family = poisson, subset=c(Timepoint=="S2D11"))
-
-#summary(polypmod2)
-#Anova(polypmod2, type="II")
-#qqPlot(residuals(polypmod2))
-
-polypmod2a<-glmer(Polyps^2 ~ Day * Treatment * Community + (1|Parent.Site/Colony) + (1|Treatment:Tank) + (1|Slide/Sample), data=stress, family = poisson)
-
-summary(polypmod2a)
-Anova(polypmod2a, type="II")
-qqPlot(residuals(polypmod2a))
-
-```
-
-
-Plot difference in temperature between single and multiple groups:    
+Display mean values. Day 23 has sufficient sample size.    
 
 ```{r, results=TRUE}
-stress$group<-paste(stress$Treatment, "-", stress$Community)
-
-polypmod2b<-glmer(Polyps^2 ~ Day * group + (1|Parent.Site/Colony) + (1|Treatment:Tank) + (1|Slide/Sample), data=stress, family = poisson)
-
-eff.surv5 <- predictorEffect("Day", xlevels=4, polypmod2b)
-
-polyp.effects2<-plot(eff.surv5,
-                   lines=list(multiline=TRUE, 
-                              col=c("blue", "blue", "red", "red"), 
-                              lty=c(1,2, 1, 2)), 
-                   confint=list(style="bands", width=4), 
-                   lwd=4,
-                   #axes=list(y=list(lim=c(0, 1))),
-                   type="response", 
-                   ylab=expression(bold("(Total Polyp Expansion)"^2)), 
-                   legend.position="right",
-                   xlab=expression(bold("Time (Days)")), 
-                   main="", 
-                   lattice=list(key.args=list(space="top",
-                                              border=FALSE, 
-                                              title=expression(bold("Treatment - Number of Juveniles")),
-                                              cex=1, 
-                                              cex.title=1)));polyp.effects2
-
-```
-
-
-Present means of growth by number of juveniles. Sample size was too low due to mortality at the end of the experiment to calculate growth within multiple juvenile groups, so we pool these together for analysis here.  
-```{r, results=TRUE}
-
-meanstressgrowth <- ddply(stress, c("Day", "Community", "Treatment"), summarise,
+meanstressgrowth <- ddply(stressdrop, c("Day", "Treatment", "Fusion.Type", "Richness.Type"), summarise,
                    N    = length(Polyps[!is.na(Polyps)]),
                    mean = mean(Polyps, na.rm=TRUE),
                    sd   = sd(Polyps, na.rm=TRUE),
@@ -578,41 +531,28 @@ meanstressgrowth <- ddply(stress, c("Day", "Community", "Treatment"), summarise,
                    upper = mean+sd
                    )
 meanstressgrowth
-
-meanstressgrowth2 <- ddply(stress, c("Day", "Treatment"), summarise,
-                   N    = length(Polyps[!is.na(Polyps)]),
-                   mean = mean(Polyps, na.rm=TRUE),
-                   sd   = sd(Polyps, na.rm=TRUE),
-                   se   = sd / sqrt(N), 
-                   max = max(Polyps, na.rm=TRUE),
-                   lower = mean-sd, 
-                   upper = mean+sd
-                   )
-meanstressgrowth2
 ```
 
-
-Next, analyze the effect of temperature on growth (polyp expansion) at day 23 of 32 during the thermal stress test. As seen in table above, this is the timepoint with sufficient sample size, as later timepoints had high mortality.  
-
-First, for the effect of community type (individual vs multiple). No need to square transform as residuals are normal on scale of raw data.  
-```{r, results=TRUE}
-polypmod3a<-glmer(Polyps ~ Treatment * Community + (1|Parent.Site/Colony) + (1|Treatment:Tank) + (1|Slide), data=d23_stress, family = poisson)
-
-summary(polypmod3a)
-Anova(polypmod3a, type="II")
-qqPlot(residuals(polypmod3a))
-```
-
-There was no difference in growth between individual and multiple juvenile groups, but an effect of temperature was significant. Next, analyze within multiple juvenile groups to look for effect of richness and fusion. 
-
-Generate a plot of this relationship.  
+Analyze the effect of temperature, fusion, and genotypic richness on polyp expansion at day 23.  
 
 ```{r, results=TRUE}
-d23_stress$group<-paste(d23_stress$Treatment, "-", d23_stress$Community)
+stresspolypmod1<-glmer(Polyps ~ Treatment + Richness.Type + Fusion.Type + Treatment:Richness.Type + Treatment:Fusion.Type + (1|Parent.Site/Colony) + (1|Treatment:Tank) + (1|Slide), data=stressdrop, family = poisson, subset=c(Timepoint=="S2D8"))
 
-polypmod3a2<-glmer(Polyps ~ Treatment + (1|Parent.Site/Colony) + (1|Treatment:Tank) + (1|Slide), data=d23_stress, family = poisson)
+summary(stresspolypmod1)
+Anova(stresspolypmod1, type="II")
+qqPlot(residuals(stresspolypmod1))
+``` 
 
-eff.stress.polyps1 <- predictorEffect("Treatment", polypmod3a2)
+There is no effect of treatment, fusion or genotypic richness on growth. Treatment is near significant at p=0.0525.  
+
+Generate a plot of polyp expansion by temperature treatment.    
+
+```{r, results=TRUE}
+stresspolypmod2<-glmer(Polyps ~ Treatment + (1|Parent.Site/Colony) + (1|Treatment:Tank) + (1|Slide), data=stressdrop, family = poisson, subset=c(Timepoint=="S2D8"))
+summary(stresspolypmod2)
+Anova(stresspolypmod2, type="II")
+
+eff.stress.polyps1 <- predictorEffect("Treatment", stresspolypmod2)
 polyps.stress.effects1<-plot(eff.stress.polyps1,
                    lines=list(multiline=TRUE, 
                               col=c("black"), 
@@ -630,25 +570,12 @@ polyps.stress.effects1<-plot(eff.stress.polyps1,
                                               #title=expression(bold("Genotypic \nRichness")),
                                               #cex=1, 
                                               #cex.title=1)));surv.effects1
-
 ```
-
-
-
-```{r, results=TRUE}
-polypmod3b<-glmer(Polyps ~ Treatment * Richness * Fusion.Partners + (1|Parent.Site/Colony) + (1|Treatment:Tank) + (1|Slide), data=d23_stress, family = poisson, subset=c(Community=="Multiple"))
-
-summary(polypmod3b)
-Anova(polypmod3b, type="II")
-qqPlot(residuals(polypmod3b))
-``` 
-
-There is no effect of fusion or genotypic richness on growth.   
 
 Combine figures for Stress Period:  
 
 ```{r, results=TRUE}
-stress_figs<-plot_grid(surv.effects3b2, surv.effects3, polyps.stress.effects1, labels = c("A", "B", "C"), ncol=3, nrow=1, rel_heights= c(1,1,1), rel_widths = c(1,1,0.8), label_size = 20, label_y=1, align="h");stress_figs
+stress_figs<-plot_grid(stress.effectsFUSE, stress.effectsRICHNESS, labels = c("A", "B"), ncol=2, nrow=1, rel_heights= c(1,1), rel_widths = c(1,1), label_size = 20, label_y=1, align="h");stress_figs
 
 ggsave(filename="Figures/stress_figs.png", plot=stress_figs, dpi=500, width=20, height=6, units="in")
 ```
