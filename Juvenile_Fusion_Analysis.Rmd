@@ -579,6 +579,8 @@ Combine figures for Stress Period:
 stress_figs<-plot_grid(stress.effectsFUSE, stress.effectsRICHNESS, labels = c("A", "B"), ncol=2, nrow=1, rel_heights= c(1,1), rel_widths = c(1,1), label_size = 20, label_y=1, align="h");stress_figs
 
 ggsave(filename="Figures/stress_figs.png", plot=stress_figs, dpi=500, width=20, height=6, units="in")
+
+ggsave(filename="Figures/stress_figs.pdf", plot=stress_figs, dpi=500, width=20, height=6, units="in")
 ```
  
 
