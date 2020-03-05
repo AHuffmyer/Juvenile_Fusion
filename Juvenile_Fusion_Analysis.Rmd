@@ -31,7 +31,7 @@ After the 15-day grow-out period, we exposed juveniles on slides to either a con
 
 
 # **Data Analysis**     
-## Analysis Setup   
+## **Analysis Setup**   
   
 Set up workspace, set options, and load required packages. 
 ```{r, echo=TRUE, show=FALSE, warning=FALSE, message=FALSE}
@@ -70,7 +70,7 @@ library(cowplot)
 library(survminer)
 ```
 
-## 1. Grow-Out Period: Survivorship  
+## **1. Grow-Out Period: Survivorship**  
 ### **Load data**     
 
 Survivorship is measured as binary (alive = 1, dead = 0) on each individual spat in the experiment.     
@@ -206,7 +206,7 @@ meansurv3
 
 ```
 
-## 2. Grow-Out Period: Fusion Rate
+## **2. Grow-Out Period: Fusion Rate**  
 
 Fusion rate is analyzed as a binary response with 1 indicating fused and 0 indicating not fused.  
 
@@ -272,7 +272,7 @@ meanfusion
 
 Fusion occured in approximately 50% of juveniles with no effect of genotypic richness.  
 
-## 3. Grow-Out Period: Polyp Expansion (Growth)  
+## **3. Grow-Out Period: Polyp Expansion (Growth)**    
 ### **Analysis**  
 
 Growth is measured as polyp expansion in each spat by the number of polyps in each spat by the end of the grow-out period. As all juveniels started as one primary polyp, there is no need to correct for initial size.      
@@ -337,7 +337,7 @@ polyp.effects1<-plot(eff.polyps1,
                                               cex.title=1)));polyp.effects1
 ```
 
-## 4. Grow Out Period Figures  
+## **4. Grow Out Period Figures**    
 
 Combine figures for Grow-Out Period using cow plot and export to figures folder.    
 ```{r, results=TRUE, warnings=FALSE}
@@ -347,7 +347,7 @@ ggsave(filename="Figures/grow_out_figs.png", plot=grow_out_figs, dpi=500, width=
 ```
 
 
-## 5. Stress Period: Survivorship
+## **5. Stress Period: Survivorship**  
 ### **Load data**     
 
 Survivorship is measured as binary response (alive=1, dead=0) on each individual spat in the experiment at multiple timepoints over the course of the stress period.  
@@ -516,7 +516,7 @@ High single = ~ 24.5 days
 
 50% mortality (LT50) is approximately 1.5 days later for multiple genotype fusions than for single genotype fusions in this stress test.  
 
-## 6. Stress Period: Fusion Persistence  
+## **6. Stress Period: Fusion Persistence**    
 
 During the stress period, we monitored the persistence of fusion as a binary response (fused = 1, not fused = 0).  
 
@@ -558,7 +558,7 @@ meanstressfuse <- ddply(final_stress_drop, c("Treatment", "Richness.Type"), summ
 meanstressfuse
 ```
 
-## 7. Stress Period: Polyp Expansion (Growth)  
+## **7. Stress Period: Polyp Expansion (Growth)**    
 
 ### **Analysis**  
 
@@ -623,7 +623,7 @@ polyps.stress.effects1<-plot(eff.stress.polyps1,
                    main=""); polyps.stress.effects1
 ```
 
-## 8. Stress Period Figures  
+## **8. Stress Period Figures**    
 
 Combine figures for Stress Period:   
 
@@ -637,7 +637,7 @@ ggsave(filename="Figures/stress_figs.pdf", plot=stress_figs, dpi=500, width=20, 
 
 ![Effects of fusion and genotypic richness on juvenile coral survival during the stress period.](Figures/stress_figs.png)
  
-## 9. Physical Data: Temperature Conditions  
+## **9. Physical Data: Temperature Conditions**    
 
 Temperature data in this experiment were recorded every 15 minutes by a Neptune Apex System. Neptune probes were calibrated to a digital thermometer weekly.     
  
