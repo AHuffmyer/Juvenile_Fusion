@@ -142,6 +142,48 @@ surv.effects1<-plot(eff.surv1,
                    main=""); surv.effects1
 ```
  
+Create plot to provide direct comparison of survival between individual juveniles, fused juveniles, and unfused juveniles. Display summary table of means.   
+
+```{r, results=TRUE, warning=FALSE, message=FALSE}
+#add categories to identify individuals, fused, or nonfused 
+final$Fusion.Type<-ifelse(final$Fusion %in% 1, "Fused",
+                   ifelse(final$Fusion %in% 0, "Unfused", NA))
+
+final$Fusion.Type<-ifelse(final$Community %in% c("Individual"), "Individual", final$Fusion.Type)
+  
+#generate summary table 
+grow_plot_surv <- ddply(final, c("Fusion.Type"), summarise,
+                   N    = length(Survivorship[!is.na(Survivorship)]),
+                   mean = mean(Survivorship, na.rm=TRUE),
+                   sd   = sd(Survivorship, na.rm=TRUE),
+                   se   = sd / sqrt(N)) 
+                
+grow_plot_surv
+
+#plot survival 
+mean_growout_plot<-ggplot(data=grow_plot_surv, aes(x=Fusion.Type, y=mean)) +
+  geom_point(size=6, position=position_dodge(0.03), color="black") +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0, linetype="solid", position=position_dodge(0.03), size=2) +
+  theme_classic()+
+  theme(text = element_text(size = 18, color="black"))+
+  theme(axis.text = element_text(size = 18, color="black"))+
+  theme(legend.position = "none")+
+  theme(axis.title = element_text(size = 22, color="black", face="bold"))+
+  ylab(expression(bold(paste("Survivorship")))) +
+  theme(legend.title=element_blank())+
+  theme(legend.text = element_text(size=18))+
+  theme(plot.margin=unit(c(1,0.1,0,0.1), "cm"))+
+  scale_y_continuous(limits=c(0,1),breaks=c(0.0,0.2,0.4,0.6,0.8,1.0))+
+  scale_x_discrete(limits=c("Individual", "Fused", "Unfused"))+
+  theme(axis.title.y = element_text(margin = margin(t = 0, r = 7, b = 0, l = 1))) +
+  theme(axis.title.x = element_text(margin = margin(t = 10, r = 0, b = 0, l = 0))) +
+  xlab("Juvenile Type"); mean_growout_plot
+
+ggsave("Figures/grow_out_means.pdf", plot=mean_growout_plot, height=11, width=6, units = c("in"), dpi=500) #output figure
+  
+```
+ 
+ 
 Create plot for the effect of fusion partners on survival within groups of juveniles.    
 ```{r, results=TRUE, warning=FALSE, message=FALSE}
 survmod2b<-glmer(Survivorship ~ Fusion.Partners + (1|Parent.Site/Colony) + (1|Tank) + (1|Slide), data=final, family=binomial, subset=c(Community=="Group"))
@@ -155,7 +197,7 @@ surv.effects2b<-plot(eff.surv2b,
                    lwd=4,
                    axes=list(y=list(lim=c(0, 1))),
                    type="response", 
-                   ylab=expression(bold("Prob(Survivorship)")), 
+                   ylab=expression(bold("")), 
                    legend.position="right",
                    xlab=expression(bold("Fusion Partners")), 
                    main="",
@@ -168,7 +210,7 @@ surv.effects2b<-plot(eff.surv2b,
 
 Within groups, there was lowest survival in juveniles without fusion partners (unfused juveniles). There was a survival advantage of juveniles fused with others.  
 
-Generate mean values of survivorship for 1) community size (individuals or groups); 2) within "group" juveniles, mean values for number of fusion partners; and 3) within "group" juveniles, mean values for genotypic richnes.   
+Generate mean values of survivorship for 1) within "group" juveniles, mean values for number of fusion partners; and 2) within "group" juveniles, mean values for genotypic richnes.   
 ```{r, results=TRUE, warning=FALSE}
 
 meansurv <- ddply(final, c("Community"), summarise,
@@ -180,7 +222,6 @@ meansurv <- ddply(final, c("Community"), summarise,
                    lower = mean-sd, 
                    upper = mean+sd
                    )
-meansurv
 
 meansurv2 <- ddply(group_final, c("Fusion.Partners"), summarise,
                    N    = length(Survivorship[!is.na(Survivorship)]),
@@ -365,10 +406,15 @@ polyp.effects1<-plot(eff.polyps1,
 
 Combine figures for Grow-Out Period using cow plot and export to figures folder.    
 ```{r, results=TRUE, warnings=FALSE}
-grow_out_figs<-plot_grid(surv.effects2b, labels = c(""), ncol=1, nrow=1, rel_heights= c(1), rel_widths = c(1), label_size = 20, label_y=1, align="h");grow_out_figs
+grow_out_figB<-plot_grid(surv.effects2b, labels = c(""), ncol=1, nrow=1, rel_heights= c(1), rel_widths = c(1), label_size = 20, label_y=1, align="h");grow_out_figB
 
-ggsave(filename="Figures/grow_out_figs.png", plot=grow_out_figs, dpi=500, width=8, height=8, units="in")
-ggsave(filename="Figures/grow_out_figs.pdf", plot=grow_out_figs, dpi=500, width=8, height=8, units="in")
+ggsave(filename="Figures/grow_out_figB.png", plot=grow_out_figB, dpi=500, width=8, height=8, units="in")
+ggsave(filename="Figures/grow_out_figB.pdf", plot=grow_out_figB, dpi=500, width=8, height=8, units="in")
+
+grow_out_figs<-plot_grid(mean_growout_plot, surv.effects2b, labels = c("A", "B"), ncol=2, nrow=1, rel_heights= c(1,0.8), rel_widths = c(0.6,1), label_size = 20, label_y=1, align="v");grow_out_figs
+
+ggsave(filename="Figures/grow_out_figs.png", plot=grow_out_figs, dpi=500, width=12, height=8, units="in")
+ggsave(filename="Figures/grow_out_figs.pdf", plot=grow_out_figs, dpi=500, width=12, height=8, units="in")
 ```
 
 
