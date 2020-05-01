@@ -744,7 +744,7 @@ Main effects: Temperature treatment, genotypic richness
 Random effects: Parent colony nested within parent collection site, tank, slide
 
 Display the model summary and anova tables for use of p-values.  
-```{r, results=FALSE, warning=FALSE, message=FALSE}
+```{r, results=TRUE, warning=FALSE, message=FALSE}
 stressfuse1<-glmer(Fusion ~ Treatment * Richness.Type + (1|Parent.Site/Colony) + (1|Treatment:Tank) + (1|Slide), data=final_stress_drop, family=binomial, subset=c(Fusion.Type=="Fused")) 
 
 summary(stressfuse1)
@@ -755,7 +755,7 @@ There is no effect of treatment or genotypic richness on fusion persistence.
 
 Check for overdispersion.  
 
-```{r, results=FALSE, warning=FALSE, message=FALSE}
+```{r, results=TRUE, warning=FALSE, message=FALSE}
 dispersion_glmer(stressfuse1) #no overdispersion
 ```
 
