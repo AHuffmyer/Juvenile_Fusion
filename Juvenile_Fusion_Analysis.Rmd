@@ -374,6 +374,15 @@ meangrowth3 <- ddply(final, c("Richness"), summarise,
                    )
 meangrowth3
 
+#generate summary table 
+grow_polyps <- ddply(final, c("Fusion.Type"), summarise,
+                   N    = length(Polyps[!is.na(Polyps)]),
+                   mean = mean(Polyps, na.rm=TRUE),
+                   sd   = sd(Polyps, na.rm=TRUE),
+                   se   = sd / sqrt(N)) 
+                
+grow_polyps
+
 ```
 
 Juveniles generated approximately 3-4 new polyps over the course of the grow-out period.  
@@ -405,7 +414,7 @@ polyp.effects1<-plot(eff.polyps1,
 ## **4. Grow Out Period Figures**    
 
 Combine figures for Grow-Out Period using cow plot and export to figures folder.    
-```{r, results=TRUE, warnings=FALSE}
+```{r, results=TRUE, warning=FALSE}
 grow_out_figB<-plot_grid(surv.effects2b, labels = c(""), ncol=1, nrow=1, rel_heights= c(1), rel_widths = c(1), label_size = 20, label_y=1, align="h");grow_out_figB
 
 ggsave(filename="Figures/grow_out_figB.png", plot=grow_out_figB, dpi=500, width=8, height=8, units="in")
