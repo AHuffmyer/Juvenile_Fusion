@@ -1,4 +1,6 @@
 
+[![DOI](https://zenodo.org/badge/227742182.svg)](https://zenodo.org/badge/latestdoi/227742182)
+
 **Study:** Tissue fusion and enhanced genotypic diversity supports survival of  _Pocillopora acuta_ coral recruits under thermal stress  
 
 **Authors:** Huffmyer AS, C Drury, J Lemus, E Majerova, R Gates  
